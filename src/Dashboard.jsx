@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { deleteTestRecord, getSubmissionsByTestId, getTests } from './lib/testStore'
 import { FREE_LIMITS, PLAN_PRO, getCreatorPlan } from './lib/subscription'
+import { getPublicTestUrl } from './lib/urls'
 
 const formatDate = (isoDate) => {
   if (!isoDate) return '-'
@@ -104,7 +105,7 @@ export default function Dashboard() {
           {testsWithStats.length > 0 ? (
             <div className="divide-y divide-slate-200">
               {testsWithStats.map((test) => {
-                const shareLink = `${window.location.origin}/test/${test.id}`
+                const shareLink = getPublicTestUrl(test.id)
                 return (
                   <div
                     key={test.id}

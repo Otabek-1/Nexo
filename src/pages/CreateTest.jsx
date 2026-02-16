@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { createTestRecord, getTestById, getTests, updateTestRecord } from '../lib/testStore'
 import { FREE_LIMITS, PLAN_PRO, getCreatorPlan } from '../lib/subscription'
+import { getPublicTestUrl } from '../lib/urls'
 
 export default function CreateTest() {
   const navigate = useNavigate()
@@ -60,7 +61,7 @@ export default function CreateTest() {
 
   const shareLink = useMemo(() => {
     if (!createdTest) return ''
-    return `${window.location.origin}/test/${createdTest.id}`
+    return getPublicTestUrl(createdTest.id)
   }, [createdTest])
 
   const handleChange = (e) => {
