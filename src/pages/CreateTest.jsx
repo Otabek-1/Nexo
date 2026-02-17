@@ -3,6 +3,9 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { createTestRecord, getTestById, getTests, updateTestRecord } from '../lib/testStore'
 import { FREE_LIMITS, PLAN_PRO, getCreatorPlan } from '../lib/subscription'
 import { getPublicTestUrl } from '../lib/urls'
+import RichContent from '../components/RichContent'
+import RichTextEditor from '../components/RichTextEditor'
+import { isRichContentEmpty } from '../lib/richContent'
 
 export default function CreateTest() {
   const navigate = useNavigate()
@@ -139,7 +142,7 @@ export default function CreateTest() {
   const normalizeQuestionForSave = () => {
     const normalized = {
       ...currentQuestion,
-      content: currentQuestion.content.trim()
+      content: currentQuestion.content
     }
 
     if (normalized.type === 'multiple-choice') {
@@ -157,7 +160,7 @@ export default function CreateTest() {
       return
     }
 
-    if (!currentQuestion.content.trim()) {
+    if (isRichContentEmpty(currentQuestion.content)) {
       alert('Savol matni bosh bolmasligi kerak')
       return
     }
@@ -674,15 +677,16 @@ export default function CreateTest() {
                 <label htmlFor="content" className="block text-sm font-medium text-slate-700 mb-2">
                   Savol Matni *
                 </label>
-                <textarea
+                <RichTextEditor
                   id="content"
-                  name="content"
                   value={currentQuestion.content}
-                  onChange={handleQuestionChange}
-                  placeholder="Savolingizni shu yerga yozing..."
-                  rows="4"
-                  className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  onChange={(next) => setCurrentQuestion(prev => ({ ...prev, content: next }))}
+                  placeholder="Savol matnini yozing, formatlang, rasm/video yoki matematik belgilar qo'shing..."
                 />
+                <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-xs font-medium text-slate-600 mb-2">Live preview</p>
+                  <RichContent html={currentQuestion.content} className="text-sm text-slate-800" />
+                </div>
               </div>
 
               {currentQuestion.type === 'multiple-choice' && (
@@ -816,8 +820,9 @@ export default function CreateTest() {
                       <div className="flex justify-between items-start">
                         <div className="flex-1">
                           <h4 className="font-semibold text-slate-800 mb-2">
-                            {index + 1}. {q.content}
+                            {index + 1}.
                           </h4>
+                          <RichContent html={q.content} className="text-slate-800 mb-2" />
                           <div className="flex gap-4 text-sm text-slate-600 flex-wrap">
                             <span className="bg-slate-100 px-2 py-1 rounded">
                               {q.type === 'short-answer' ? 'Qisqa Javob' :

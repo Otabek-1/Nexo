@@ -2,6 +2,7 @@ import React, { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { getSubmissionsByTestId, getTestById, updateSubmissionRecord } from '../lib/testStore'
 import { FREE_LIMITS, PLAN_PRO, getPlanForTest } from '../lib/subscription'
+import RichContent from '../components/RichContent'
 
 const getQuestionPoints = (question) => {
   const parsed = Number(question.points)
@@ -159,7 +160,8 @@ export default function ReviewSubmissions() {
                 <div className="mt-4 space-y-4">
                   {manualReviewQuestions.map((question, index) => (
                     <div key={question.id} className="border border-slate-200 rounded-lg p-4">
-                      <p className="font-medium text-slate-800">{index + 1}. {question.content}</p>
+                      <p className="font-medium text-slate-800">{index + 1}.</p>
+                      <RichContent html={question.content} className="text-slate-800 mt-1" />
                       <p className="text-sm text-slate-600 mt-2">Javob: {submission.answers?.[question.id] || '(Bo`sh)'}</p>
                       <div className="mt-3 max-w-xs">
                         <label className="block text-sm text-slate-700 mb-1">Ball (max {getQuestionPoints(question)})</label>
