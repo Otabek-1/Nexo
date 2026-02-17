@@ -1,6 +1,9 @@
 /**
  * Common validation utilities for form inputs and data
+ * Provides comprehensive validation for all common input types
  */
+
+import { AppError, ERROR_CATEGORY, ERROR_SEVERITY } from './errorHandler'
 
 export const validators = {
   // Email validation
@@ -143,4 +146,135 @@ export const validateTestData = (data) => {
   }
 
   return { valid: Object.keys(errors).length === 0, errors }
+}
+
+/**
+ * Create a form validator with custom rules
+ */
+export const createFormValidator = (rules) => {
+  return (data) => {
+    const errors = {}
+
+    Object.entries(rules).forEach(([field, fieldRules]) => {
+      const value = data[field]
+
+      // If multiple rules provided for field
+      if (Array.isArray(fieldRules)) {
+        for (const rule of fieldRules) {
+          const result = rule(value, field)
+          if (!result.valid) {
+            errors[field] = result.message
+            break // Stop at first error for this field
+          }
+        }
+      } else if (typeof fieldRules === 'function') {
+        const result = fieldRules(value, field)
+        if (!result.valid) {
+          errors[field] = result.message
+        }
+      }
+    })
+
+    const isValid = Object.keys(errors).length === 0
+    return { valid: isValid, errors, hasErrors: !isValid }
+  }
+}
+
+/**
+ * Common validation rules that can be composed
+ */
+export const rules = {
+  required: (fieldName = 'Field') => (value) => {
+    if (!value || (typeof value === 'string' && !value.trim())) {
+      return { valid: false, message: `${fieldName} majburiy` }
+    }
+    return { valid: true }
+  },
+
+  email: (fieldName = 'Email') => (value) => {
+    const result = validators.email(value)
+    if (!result.valid) {
+      return { valid: false, message: result.message }
+    }
+    return { valid: true }
+  },
+
+  minLength: (min, fieldName = 'Field') => (value) => {
+    const result = validators.minLength(value, min, fieldName)
+    if (!result.valid) {
+      return { valid: false, message: result.message }
+    }
+    return { valid: true }
+  },
+
+  maxLength: (max, fieldName = 'Field') => (value) => {
+    const result = validators.maxLength(value, max, fieldName)
+    if (!result.valid) {
+      return { valid: false, message: result.message }
+    }
+    return { valid: true }
+  },
+
+  pattern: (pattern, fieldName = 'Field') => (value) => {
+    if (!pattern.test(String(value || ''))) {
+      return { valid: false, message: `${fieldName} noto'g'ri format` }
+    }
+    return { valid: true }
+  },
+
+  custom: (validator, errorMessage) => (value) => {
+    try {
+      const result = validator(value)
+      return result ? { valid: true } : { valid: false, message: errorMessage }
+    } catch (error) {
+      return { valid: false, message: errorMessage || 'Tekshiruv xatosi' }
+    }
+  },
+}
+
+/**
+ * Async form validator for server-side checks
+ */
+export const createAsyncFormValidator = (rules) => {
+  return async (data) => {
+    const errors = {}
+
+    for (const [field, fieldRules] of Object.entries(rules)) {
+      const value = data[field]
+
+      if (Array.isArray(fieldRules)) {
+        for (const rule of fieldRules) {
+          const result = await Promise.resolve(rule(value, field))
+          if (!result.valid) {
+            errors[field] = result.message
+            break
+          }
+        }
+      } else if (typeof fieldRules === 'function') {
+        const result = await Promise.resolve(fieldRules(value, field))
+        if (!result.valid) {
+          errors[field] = result.message
+        }
+      }
+    }
+
+    return { valid: Object.keys(errors).length === 0, errors }
+  }
+}
+
+/**
+ * Debounced validation for real-time field validation
+ */
+export const createDebouncedValidator = (validator, delayMs = 300) => {
+  let timeoutId
+
+  return (value) => {
+    return new Promise((resolve) => {
+      clearTimeout(timeoutId)
+      timeoutId = setTimeout(() => {
+        const result = validator(value)
+        resolve(result)
+      }, delayMs)
+    })
+  }
 }
