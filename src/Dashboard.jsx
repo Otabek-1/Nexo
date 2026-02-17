@@ -61,6 +61,7 @@ export default function Dashboard() {
   return (
     <div className="w-full min-h-screen bg-slate-50">
       <header className="bg-white shadow-sm border-b border-slate-200">
+      <marquee behavior="" direction="">Sayt test rejimida ishlamoqda va ba'zi kichik muammolarga duch kelishingiz mumkin. Hozircha oddiy test turidan foydalanishni tavsiya qilamiz va tez orada barcha muammolarni tuzatamiz!</marquee>
         <div className="max-w-6xl mx-auto px-8 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <h1 className="text-3xl font-bold text-blue-600">Nexo</h1>
