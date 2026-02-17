@@ -7,13 +7,22 @@ const readJson = (key) => {
     if (!raw) return []
     const parsed = JSON.parse(raw)
     return Array.isArray(parsed) ? parsed : []
-  } catch {
+  } catch (error) {
+    console.error(`[testStore] Error reading ${key}:`, error)
     return []
   }
 }
 
 const writeJson = (key, value) => {
-  localStorage.setItem(key, JSON.stringify(value))
+  try {
+    localStorage.setItem(key, JSON.stringify(value))
+  } catch (error) {
+    console.error(`[testStore] Error writing ${key}:`, error)
+    if (error.name === 'QuotaExceededError') {
+      console.error('[testStore] localStorage quota exceeded')
+    }
+    throw error
+  }
 }
 
 export const getTests = () => {
