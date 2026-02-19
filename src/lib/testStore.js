@@ -1,126 +1,156 @@
-const TESTS_KEY = 'nexo_tests_v1'
-const SUBMISSIONS_KEY = 'nexo_submissions_v1'
+import { apiRequest } from './api'
 
-const readJson = (key) => {
-  try {
-    const raw = localStorage.getItem(key)
-    if (!raw) return []
-    const parsed = JSON.parse(raw)
-    return Array.isArray(parsed) ? parsed : []
-  } catch (error) {
-    console.error(`[testStore] Error reading ${key}:`, error)
-    return []
+const toClientTest = (row) => {
+  if (!row) return null
+  if (row.testData && row.questions) return row
+  return {
+    id: row.id,
+    testData: row.testData || {},
+    questions: row.questions || [],
+    creatorPlan: row.creatorPlan || 'free',
+    createdAt: row.createdAt || new Date().toISOString(),
+    hasEssay: Boolean(row.hasEssay),
+    hasOpenQuestions: Boolean(row.hasOpenQuestions)
   }
 }
 
-const writeJson = (key, value) => {
-  try {
-    localStorage.setItem(key, JSON.stringify(value))
-  } catch (error) {
-    console.error(`[testStore] Error writing ${key}:`, error)
-    if (error.name === 'QuotaExceededError') {
-      console.error('[testStore] localStorage quota exceeded')
-    }
-    throw error
-  }
+export const getTests = async () => {
+  const rows = await apiRequest('/tests')
+  return (rows || []).map((item) => ({
+    id: item.id,
+    testData: item.testData,
+    questions: [],
+    creatorPlan: item.creatorPlan,
+    createdAt: item.createdAt,
+    hasEssay: false,
+    hasOpenQuestions: false,
+    submissionsCount: item?.stats?.submissionsCount || 0,
+    pendingCount: item?.stats?.pendingCount || 0
+  }))
 }
 
-export const getTests = () => {
-  return readJson(TESTS_KEY)
-}
-
-export const getTestById = (id) => {
+export const getTestById = async (id) => {
   const testId = Number(id)
-  return getTests().find(test => Number(test.id) === testId) || null
-}
+  if (!Number.isFinite(testId)) return null
 
-export const createTestRecord = ({ testData, questions, creatorPlan }) => {
-  const tests = getTests()
-  const nextId = tests.length > 0 ? Math.max(...tests.map(t => Number(t.id) || 0)) + 1 : 1
-
-  const record = {
-    id: nextId,
-    testData,
-    questions,
-    creatorPlan: creatorPlan || 'free',
-    createdAt: new Date().toISOString(),
-    hasEssay: questions.some(q => q.type === 'essay'),
-    hasOpenQuestions: questions.some(q => q.type === 'essay' || q.type === 'short-answer')
+  try {
+    const row = await apiRequest(`/tests/${testId}`)
+    return toClientTest(row)
+  } catch {
+    try {
+      const sessionConfig = await apiRequest(`/tests/${testId}/session-config`, { auth: false })
+      return toClientTest({
+        id: sessionConfig.id,
+        testData: sessionConfig.testData,
+        questions: sessionConfig.questions,
+        creatorPlan: sessionConfig.creatorPlan
+      })
+    } catch {
+      return null
+    }
   }
-
-  writeJson(TESTS_KEY, [record, ...tests])
-  return record
 }
 
-export const updateTestRecord = (testId, updater) => {
-  const all = getTests()
-  let updated = null
-  const normalizedId = Number(testId)
-
-  const next = all.map(item => {
-    if (Number(item.id) !== normalizedId) return item
-    updated = typeof updater === 'function' ? updater(item) : updater
-    return updated
+export const createTestRecord = async ({ testData, questions }) => {
+  const row = await apiRequest('/tests', {
+    method: 'POST',
+    body: { testData, questions }
   })
-
-  if (!updated) return null
-  writeJson(TESTS_KEY, next)
-  return updated
+  return toClientTest(row)
 }
 
-export const getSubmissions = () => {
-  return readJson(SUBMISSIONS_KEY)
+export const updateTestRecord = async (testId, updater) => {
+  const current = await getTestById(testId)
+  if (!current) return null
+  const next = typeof updater === 'function' ? updater(current) : updater
+  const row = await apiRequest(`/tests/${Number(testId)}`, {
+    method: 'PATCH',
+    body: {
+      testData: next.testData,
+      questions: next.questions
+    }
+  })
+  return toClientTest(row)
 }
 
-export const getSubmissionsByTestId = (testId) => {
+export const getSubmissionsByTestId = async (testId) => {
   const normalizedId = Number(testId)
-  return getSubmissions().filter(item => Number(item.testId) === normalizedId)
+  if (!Number.isFinite(normalizedId)) return []
+  return await apiRequest(`/tests/${normalizedId}/submissions`)
 }
 
-export const getAttemptsForPhone = (testId, phone) => {
+export const getAttemptsForPhone = async (testId, phone) => {
   const normalized = String(phone || '').trim()
   if (!normalized) return 0
-  return getSubmissionsByTestId(testId).filter(s => s.participant?.phone === normalized).length
+  const result = await apiRequest(`/tests/${Number(testId)}/attempts/validate`, {
+    method: 'POST',
+    auth: false,
+    body: { participant_value: normalized }
+  })
+  return Number(result?.used_attempts || 0)
 }
 
-export const getAttemptsForParticipantValue = (testId, value) => {
+export const getAttemptsForParticipantValue = async (testId, value) => {
   const normalized = String(value || '').trim()
   if (!normalized) return 0
-  return getSubmissionsByTestId(testId).filter(
-    s => String(s.participant?.attemptValue || s.participant?.fullName || '').trim() === normalized
-  ).length
-}
-
-export const createSubmissionRecord = (submission) => {
-  const all = getSubmissions()
-  writeJson(SUBMISSIONS_KEY, [submission, ...all])
-  return submission
-}
-
-export const updateSubmissionRecord = (submissionId, updater) => {
-  const all = getSubmissions()
-  let updated = null
-  const next = all.map(item => {
-    if (item.id !== submissionId) return item
-    updated = typeof updater === 'function' ? updater(item) : updater
-    return updated
+  const result = await apiRequest(`/tests/${Number(testId)}/attempts/validate`, {
+    method: 'POST',
+    auth: false,
+    body: { participant_value: normalized }
   })
-
-  if (!updated) return null
-  writeJson(SUBMISSIONS_KEY, next)
-  return updated
+  return Number(result?.used_attempts || 0)
 }
 
-export const deleteTestRecord = (testId) => {
-  const normalizedId = Number(testId)
-  const tests = getTests()
-  const nextTests = tests.filter(item => Number(item.id) !== normalizedId)
-  if (nextTests.length === tests.length) return false
-
-  const submissions = getSubmissions()
-  const nextSubmissions = submissions.filter(item => Number(item.testId) !== normalizedId)
-
-  writeJson(TESTS_KEY, nextTests)
-  writeJson(SUBMISSIONS_KEY, nextSubmissions)
-  return true
+export const createSubmissionRecord = async (submissionLike) => {
+  const payload = {
+    participant_values: submissionLike?.participant?.fields || {},
+    answers: submissionLike?.answers || {}
+  }
+  return await apiRequest(`/tests/${Number(submissionLike.testId)}/submissions`, {
+    method: 'POST',
+    auth: false,
+    body: payload,
+    headers: submissionLike?.id ? { 'Idempotency-Key': String(submissionLike.id) } : {}
+  })
 }
+
+export const updateSubmissionRecord = async (testId, submissionId, patch) => {
+  if (patch?.manualGrades) {
+    return await apiRequest(`/tests/${Number(testId)}/submissions/${submissionId}/manual-grades`, {
+      method: 'PATCH',
+      body: { grades: patch.manualGrades }
+    })
+  }
+  return await apiRequest(`/tests/${Number(testId)}/submissions/${submissionId}/finalize`, {
+    method: 'POST',
+    body: { final_score_override: patch?.finalScore ?? null }
+  })
+}
+
+export const saveManualGrade = async (testId, submissionId, questionId, score) => {
+  return await apiRequest(`/tests/${Number(testId)}/submissions/${submissionId}/manual-grades`, {
+    method: 'PATCH',
+    body: { grades: { [questionId]: Number(score) } }
+  })
+}
+
+export const finalizeSubmission = async (testId, submissionId, override = null) => {
+  return await apiRequest(`/tests/${Number(testId)}/submissions/${submissionId}/finalize`, {
+    method: 'POST',
+    body: { final_score_override: override }
+  })
+}
+
+export const getLeaderboard = async (testId) => {
+  return await apiRequest(`/tests/${Number(testId)}/leaderboard`, { auth: false })
+}
+
+export const deleteTestRecord = async (testId) => {
+  try {
+    await apiRequest(`/tests/${Number(testId)}`, { method: 'DELETE' })
+    return true
+  } catch {
+    return false
+  }
+}
+

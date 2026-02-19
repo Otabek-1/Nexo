@@ -32,14 +32,14 @@ export default function PlansPage() {
 
   const isYearly = billingCycle === 'yearly'
 
-  const handleUpgrade = (planType) => {
-    setCreatorPlan(PLAN_PRO)
+  const handleUpgrade = async (planType) => {
+    await setCreatorPlan(PLAN_PRO)
     alert(`${planType} rejasi tanlandi. Demo muhiti uchun Pro aktiv qilindi.`)
     navigate('/dashboard')
   }
 
-  const handleGetStarted = () => {
-    setCreatorPlan(PLAN_FREE)
+  const handleGetStarted = async () => {
+    await setCreatorPlan(PLAN_FREE)
     navigate('/dashboard')
   }
 

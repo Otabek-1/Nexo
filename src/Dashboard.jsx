@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { deleteTestRecord, getSubmissionsByTestId, getTests } from './lib/testStore'
-import { FREE_LIMITS, PLAN_PRO, getCreatorPlan } from './lib/subscription'
+import { deleteTestRecord, getTests } from './lib/testStore'
+import { FREE_LIMITS, PLAN_PRO, getCreatorPlan, refreshCreatorPlan } from './lib/subscription'
 import { getPublicTestUrl } from './lib/urls'
-import { logoutUser, getCurrentUser } from './lib/auth'
+import { getCurrentUser, logoutUser, refreshCurrentUser } from './lib/auth'
 
 const formatDate = (isoDate) => {
   if (!isoDate) return '-'
@@ -14,42 +14,64 @@ const formatDate = (isoDate) => {
 
 export default function Dashboard() {
   const navigate = useNavigate()
-  const plan = getCreatorPlan()
+  const [plan, setPlan] = useState(getCreatorPlan())
+  const [tests, setTests] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [refreshTick, setRefreshTick] = useState(0)
+  const [currentUser, setCurrentUser] = useState(getCurrentUser())
   const isPro = plan === PLAN_PRO
-  const [, setRefreshTick] = useState(0)
-  const currentUser = getCurrentUser()
-
-  const tests = getTests()
 
   useEffect(() => {
     sessionStorage.setItem('nexo_creator_mode', '1')
   }, [])
 
-  const handleLogout = () => {
+  useEffect(() => {
+    let isMounted = true
+    const load = async () => {
+      setLoading(true)
+      try {
+        const [nextPlan, nextTests, nextUser] = await Promise.all([
+          refreshCreatorPlan(),
+          getTests(),
+          refreshCurrentUser()
+        ])
+        if (!isMounted) return
+        setPlan(nextPlan)
+        setTests(Array.isArray(nextTests) ? nextTests : [])
+        setCurrentUser(nextUser || null)
+      } catch (error) {
+        console.error('[Dashboard] load failed:', error)
+      } finally {
+        if (isMounted) setLoading(false)
+      }
+    }
+    load()
+    return () => {
+      isMounted = false
+    }
+  }, [refreshTick])
+
+  const handleLogout = async () => {
     const confirmed = window.confirm('Rostdan ham chiqishni xohlaysizmi?')
     if (!confirmed) return
     
-    logoutUser()
+    await logoutUser()
     navigate('/')
   }
 
   const testsWithStats = useMemo(() => {
-    return tests.map(test => {
-      const submissions = getSubmissionsByTestId(test.id)
-      const pending = submissions.filter(s => s.status === 'pending_review').length
-      return {
-        ...test,
-        submissionsCount: submissions.length,
-        pendingCount: pending
-      }
-    })
+    return tests.map(test => ({
+      ...test,
+      submissionsCount: Number(test.submissionsCount || 0),
+      pendingCount: Number(test.pendingCount || 0)
+    }))
   }, [tests])
 
-  const handleDeleteTest = (testId) => {
+  const handleDeleteTest = async (testId) => {
     const confirmed = window.confirm('Rostdan ham bu imtihonni ochirmoqchimisiz? Barcha submissionlar ham ochiriladi.')
     if (!confirmed) return
 
-    const deleted = deleteTestRecord(testId)
+    const deleted = await deleteTestRecord(testId)
     if (!deleted) {
       alert('Imtihonni ochirishda xatolik boldi')
       return
@@ -120,7 +142,11 @@ export default function Dashboard() {
             <h3 className="text-xl font-bold text-slate-800">Yaratilgan Imtihonlar</h3>
           </div>
 
-          {testsWithStats.length > 0 ? (
+          {loading ? (
+            <div className="px-8 py-12 text-center text-slate-600">
+              <p className="text-lg">Yuklanmoqda...</p>
+            </div>
+          ) : testsWithStats.length > 0 ? (
             <div className="divide-y divide-slate-200">
               {testsWithStats.map((test) => {
                 const shareLink = getPublicTestUrl(test.id)

@@ -1,6 +1,6 @@
-import React, { useMemo } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { getSubmissionsByTestId, getTestById } from '../lib/testStore'
+import { getLeaderboard, getTestById } from '../lib/testStore'
 
 const formatDateTime = (isoDate) => {
   if (!isoDate) return '-'
@@ -24,26 +24,47 @@ const getParticipantSecondary = (participant) => {
 
 export default function TestResults() {
   const { id } = useParams()
-  const test = getTestById(id)
+  const [test, setTest] = useState(null)
+  const [leaderboard, setLeaderboard] = useState({ ranked: [], pending: [] })
+  const [loading, setLoading] = useState(true)
 
-  const { ranked, pending } = useMemo(() => {
-    if (!test) return { ranked: [], pending: [] }
+  useEffect(() => {
+    let mounted = true
+    const load = async () => {
+      try {
+        setLoading(true)
+        const nextTest = await getTestById(id)
+        if (!mounted) return
+        setTest(nextTest)
+        if (nextTest?.id) {
+          const nextLeaderboard = await getLeaderboard(nextTest.id)
+          if (!mounted) return
+          setLeaderboard(nextLeaderboard || { ranked: [], pending: [] })
+        }
+      } catch (error) {
+        console.error('[TestResults] load failed:', error)
+      } finally {
+        if (mounted) setLoading(false)
+      }
+    }
+    load()
+    return () => {
+      mounted = false
+    }
+  }, [id])
 
-    const submissions = getSubmissionsByTestId(test.id)
-    const done = submissions
-      .filter(s => s.status === 'completed' && Number.isFinite(Number(s.finalScore)))
-      .sort((a, b) => {
-        const scoreDiff = Number(b.finalScore) - Number(a.finalScore)
-        if (scoreDiff !== 0) return scoreDiff
-        return new Date(a.submittedAt).getTime() - new Date(b.submittedAt).getTime()
-      })
+  const ranked = leaderboard?.ranked || []
+  const pending = leaderboard?.pending || []
 
-    const waiting = submissions
-      .filter(s => s.status !== 'completed')
-      .sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime())
-
-    return { ranked: done, pending: waiting }
-  }, [test])
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+        <div className="bg-white border border-slate-200 rounded-xl p-8 max-w-lg text-center">
+          <h1 className="text-2xl font-bold text-slate-800 mb-2">Yuklanmoqda...</h1>
+        </div>
+      </div>
+    )
+  }
 
   if (!test) {
     return (

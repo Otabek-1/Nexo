@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
-import { createSubmissionRecord, getAttemptsForParticipantValue, getSubmissionsByTestId, getTestById } from '../lib/testStore'
-import { FREE_LIMITS, PLAN_PRO, getPlanForTest } from '../lib/subscription'
+import { createSubmissionRecord, getAttemptsForParticipantValue, getTestById } from '../lib/testStore'
 import RichContent from '../components/RichContent'
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -160,9 +159,28 @@ function AutoSubmitToast() {
 export default function TestSession() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const test = getTestById(id)
-  const creatorPlan = getPlanForTest(test)
-  const isPro = creatorPlan === PLAN_PRO
+  const [test, setTest] = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let mounted = true
+    const load = async () => {
+      try {
+        setLoading(true)
+        const row = await getTestById(id)
+        if (!mounted) return
+        setTest(row)
+      } catch (error) {
+        console.error('[TestSession] load failed:', error)
+      } finally {
+        if (mounted) setLoading(false)
+      }
+    }
+    load()
+    return () => {
+      mounted = false
+    }
+  }, [id])
 
   // ── Participant fields ──
   const participantFields = useMemo(() => {
@@ -281,7 +299,7 @@ export default function TestSession() {
   }, [timing.status, test, navigate])
 
   // ── Auto-submit when duration runs out ──
-  const doSubmit = useCallback((currentAnswers) => {
+  const doSubmit = useCallback(async (currentAnswers) => {
     if (autoSubmitRef.current) return
     autoSubmitRef.current = true
 
@@ -321,10 +339,10 @@ export default function TestSession() {
       reviewedAt: null,
     }
 
-    createSubmissionRecord(submission)
+    const saved = await createSubmissionRecord(submission)
     // Mark session as done
     try { sessionStorage.removeItem(sessionKey) } catch { }
-    setSubmitted(submission)
+    setSubmitted(saved || submission)
     setShowConfirm(false)
     setAutoSubmitting(false)
   }, [test, answers, participantValues, requiresManualReview, sessionKey])
@@ -340,7 +358,7 @@ export default function TestSession() {
   }, [durationRemaining, started, submitted, durationEndTs, durationMs, doSubmit, answers])
 
   // ── Handle Start ──
-  const handleStart = (e) => {
+  const handleStart = async (e) => {
     e.preventDefault()
 
     const normalizedParticipant = {}
@@ -356,14 +374,9 @@ export default function TestSession() {
     const attemptValue = normalizedParticipant.fullName || ''
     if (!attemptValue) { alert('Full Name maydoni majburiy'); return }
 
-    const attemptCount = getAttemptsForParticipantValue(test.id, attemptValue)
+    const attemptCount = await getAttemptsForParticipantValue(test.id, attemptValue)
     if (attemptCount >= Number(test.testData.attemptsCount)) {
       alert('Bu participant uchun urinish limiti tugagan')
-      return
-    }
-
-    if (!isPro && getSubmissionsByTestId(test.id).length >= FREE_LIMITS.submissionsPerTest) {
-      alert(`Bu test Free limitiga yetgan (${FREE_LIMITS.submissionsPerTest} ta submission). Creator Pro ni yoqishi kerak.`)
       return
     }
 
@@ -397,6 +410,16 @@ export default function TestSession() {
   const answeredCount = (shuffledQuestions.length || 0) - unansweredCount
 
   // ── Not found ──
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+        <div className="bg-white border border-slate-200 rounded-xl p-8 max-w-lg text-center">
+          <h1 className="text-2xl font-bold text-slate-800 mb-2">Yuklanmoqda...</h1>
+        </div>
+      </div>
+    )
+  }
+
   if (!test) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">

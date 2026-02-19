@@ -1,29 +1,37 @@
+import { apiRequest } from './api'
+
 const AUTH_USER_KEY = 'nexo_auth_user_v1'
 const AUTH_SESSION_KEY = 'nexo_auth_session_v1'
 const AUTH_TOKEN_KEY = 'nexo_auth_token_v1'
+const AUTH_REFRESH_KEY = 'nexo_auth_refresh_token_v1'
 
-// Get all registered users from storage
-const getStoredUsers = () => {
-  try {
-    const raw = localStorage.getItem('nexo_users_db_v1')
-    return raw ? JSON.parse(raw) : {}
-  } catch {
-    return {}
+const clearLocalAuth = () => {
+  localStorage.removeItem(AUTH_USER_KEY)
+  localStorage.removeItem(AUTH_TOKEN_KEY)
+  localStorage.removeItem(AUTH_REFRESH_KEY)
+  localStorage.removeItem(AUTH_SESSION_KEY)
+}
+
+const saveAuthSession = (authResponse) => {
+  const now = Date.now()
+  const expiresInSec = Number(authResponse?.tokens?.expires_in || 900)
+  const session = {
+    userId: authResponse.user.id,
+    email: authResponse.user.email,
+    createdAt: new Date(now).toISOString(),
+    expiresAt: new Date(now + expiresInSec * 1000).toISOString()
   }
+  localStorage.setItem(AUTH_USER_KEY, JSON.stringify(authResponse.user))
+  localStorage.setItem(AUTH_TOKEN_KEY, authResponse.tokens.access_token)
+  localStorage.setItem(AUTH_REFRESH_KEY, authResponse.tokens.refresh_token)
+  localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(session))
 }
 
-// Save users to storage
-const saveStoredUsers = (users) => {
-  localStorage.setItem('nexo_users_db_v1', JSON.stringify(users))
-}
-
-// Validate email format
 export const isValidEmail = (email) => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
   return emailRegex.test(String(email).toLowerCase())
 }
 
-// Validate password strength
 export const validatePassword = (password) => {
   if (!password || password.length < 6) {
     return { valid: false, message: 'Parol kamida 6 ta belgi bo\'lishi kerak' }
@@ -31,23 +39,7 @@ export const validatePassword = (password) => {
   return { valid: true }
 }
 
-// Generate a simple hash (for demo - in production use bcrypt)
-const hashPassword = (password) => {
-  // This is a placeholder. In production, use proper bcrypt hashing
-  // For now, using a simple transformation with salt
-  const salt = 'nexo_salt_2024'
-  let hash = 0
-  const str = salt + password
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i)
-    hash = ((hash << 5) - hash) + char
-    hash = hash & hash // Convert to 32bit integer
-  }
-  return Math.abs(hash).toString(16)
-}
-
-// Register a new user
-export const registerUser = (email, password) => {
+export const registerUser = async (email, password, fullName = '') => {
   const normalizedEmail = String(email).trim().toLowerCase()
 
   if (!isValidEmail(normalizedEmail)) {
@@ -59,29 +51,31 @@ export const registerUser = (email, password) => {
     return { success: false, message: passwordValidation.message }
   }
 
-  const users = getStoredUsers()
+  const normalizedName = String(fullName || '').trim()
+  const fallbackName = normalizedEmail.split('@')[0] || 'User'
+  const safeName = normalizedName.length >= 3 ? normalizedName : fallbackName
 
-  if (users[normalizedEmail]) {
-    return { success: false, message: 'Bu email bilan foydalanuvchi allaqachon mavjud' }
-  }
-
-  users[normalizedEmail] = {
-    email: normalizedEmail,
-    passwordHash: hashPassword(password),
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  }
-
-  saveStoredUsers(users)
-
-  return {
-    success: true,
-    message: 'Ro\'yxatdan muvaffaqiyatli o\'tdingiz',
-    user: { email: normalizedEmail }
+  try {
+    const response = await apiRequest('/auth/register', {
+      method: 'POST',
+      auth: false,
+      body: {
+        email: normalizedEmail,
+        password,
+        full_name: safeName
+      }
+    })
+    saveAuthSession(response)
+    return {
+      success: true,
+      message: 'Ro\'yxatdan muvaffaqiyatli o\'tdingiz',
+      user: { email: response.user.email }
+    }
+  } catch (error) {
+    return { success: false, message: error.message || 'Ro\'yxatdan o\'tishda xatolik' }
   }
 }
 
-// Authenticate user
 export const authenticateUser = async (email, password) => {
   const normalizedEmail = String(email).trim().toLowerCase()
 
@@ -93,42 +87,23 @@ export const authenticateUser = async (email, password) => {
     return { success: false, message: 'Parol kiritilmagan' }
   }
 
-  // Simulate async operation
-  await new Promise(resolve => setTimeout(resolve, 300))
-
-  const users = getStoredUsers()
-  const user = users[normalizedEmail]
-
-  if (!user) {
-    return { success: false, message: 'Foydalanuvchi topilmadi' }
-  }
-
-  const passwordHash = hashPassword(password)
-  if (user.passwordHash !== passwordHash) {
-    return { success: false, message: 'Parol noto\'g\'ri' }
-  }
-
-  // Create session
-  const session = {
-    userId: normalizedEmail,
-    email: normalizedEmail,
-    createdAt: new Date().toISOString(),
-    expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // 24 hours
-  }
-
-  const token = btoa(JSON.stringify(session))
-  localStorage.setItem(AUTH_USER_KEY, JSON.stringify({ email: normalizedEmail }))
-  localStorage.setItem(AUTH_TOKEN_KEY, token)
-  localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(session))
-
-  return {
-    success: true,
-    message: 'Muvaffaqiyatli kirish',
-    user: { email: normalizedEmail }
+  try {
+    const response = await apiRequest('/auth/login', {
+      method: 'POST',
+      auth: false,
+      body: { email: normalizedEmail, password }
+    })
+    saveAuthSession(response)
+    return {
+      success: true,
+      message: 'Muvaffaqiyatli kirish',
+      user: { email: response.user.email }
+    }
+  } catch (error) {
+    return { success: false, message: error.message || 'Kirish amalga oshmadi' }
   }
 }
 
-// Get current session
 export const getCurrentSession = () => {
   try {
     const raw = localStorage.getItem(AUTH_SESSION_KEY)
@@ -139,7 +114,7 @@ export const getCurrentSession = () => {
     const now = Date.now()
 
     if (now > expiresAt) {
-      logoutUser()
+      clearLocalAuth()
       return null
     }
 
@@ -149,12 +124,8 @@ export const getCurrentSession = () => {
   }
 }
 
-// Check if user is authenticated
-export const isAuthenticated = () => {
-  return Boolean(getCurrentSession())
-}
+export const isAuthenticated = () => Boolean(getCurrentSession() && localStorage.getItem(AUTH_TOKEN_KEY))
 
-// Get current user
 export const getCurrentUser = () => {
   try {
     const raw = localStorage.getItem(AUTH_USER_KEY)
@@ -164,17 +135,37 @@ export const getCurrentUser = () => {
   }
 }
 
-// Logout user
-export const logoutUser = () => {
-  localStorage.removeItem(AUTH_USER_KEY)
-  localStorage.removeItem(AUTH_TOKEN_KEY)
-  localStorage.removeItem(AUTH_SESSION_KEY)
+export const refreshCurrentUser = async () => {
+  try {
+    const me = await apiRequest('/me')
+    const nextUser = {
+      id: me.id,
+      email: me.email,
+      full_name: me.full_name,
+      role: me.role
+    }
+    localStorage.setItem(AUTH_USER_KEY, JSON.stringify(nextUser))
+    return nextUser
+  } catch {
+    return getCurrentUser()
+  }
+}
+
+export const logoutUser = async () => {
+  const refreshToken = localStorage.getItem(AUTH_REFRESH_KEY)
+  try {
+    if (refreshToken) {
+      await apiRequest('/auth/logout', {
+        method: 'POST',
+        body: { refresh_token: refreshToken }
+      })
+    }
+  } catch {
+    // ignore logout API failure on client side
+  } finally {
+    clearLocalAuth()
+  }
   return { success: true }
 }
 
-// Check email existence
-export const emailExists = (email) => {
-  const normalizedEmail = String(email).trim().toLowerCase()
-  const users = getStoredUsers()
-  return Boolean(users[normalizedEmail])
-}
+export const emailExists = () => false

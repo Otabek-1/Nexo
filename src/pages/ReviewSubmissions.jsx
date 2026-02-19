@@ -1,6 +1,6 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { getSubmissionsByTestId, getTestById, updateSubmissionRecord } from '../lib/testStore'
+import { finalizeSubmission, getSubmissionsByTestId, getTestById, saveManualGrade } from '../lib/testStore'
 import { FREE_LIMITS, PLAN_PRO, getPlanForTest } from '../lib/subscription'
 import RichContent from '../components/RichContent'
 
@@ -20,17 +20,45 @@ const getParticipantSecondary = (participant) => {
 
 export default function ReviewSubmissions() {
   const { id } = useParams()
-  const test = getTestById(id)
+  const [test, setTest] = useState(null)
+  const [submissions, setSubmissions] = useState([])
+  const [loading, setLoading] = useState(true)
   const isCreatorMode = sessionStorage.getItem('nexo_creator_mode') === '1'
-  const creatorPlan = getPlanForTest(test)
+  const creatorPlan = getPlanForTest(test || {})
   const isPro = creatorPlan === PLAN_PRO
 
-  const [, setRefreshTick] = useState(0)
-  const submissions = test ? getSubmissionsByTestId(test.id) : []
+  const [refreshTick, setRefreshTick] = useState(0)
   const visibleSubmissions = isPro ? submissions : submissions.slice(0, FREE_LIMITS.manualReviewRecent)
-  const manualReviewQuestions = test
+  const manualReviewQuestions = test?.questions
     ? test.questions.filter(q => q.type === 'essay' || q.type === 'short-answer')
     : []
+
+  useEffect(() => {
+    let mounted = true
+    const load = async () => {
+      try {
+        setLoading(true)
+        const fetchedTest = await getTestById(id)
+        if (!mounted) return
+        setTest(fetchedTest)
+        if (fetchedTest?.id) {
+          const rows = await getSubmissionsByTestId(fetchedTest.id)
+          if (!mounted) return
+          setSubmissions(Array.isArray(rows) ? rows : [])
+        } else {
+          setSubmissions([])
+        }
+      } catch (error) {
+        console.error('[ReviewSubmissions] load failed:', error)
+      } finally {
+        if (mounted) setLoading(false)
+      }
+    }
+    load()
+    return () => {
+      mounted = false
+    }
+  }, [id, refreshTick])
 
   if (!test) {
     return (
@@ -55,20 +83,16 @@ export default function ReviewSubmissions() {
     )
   }
 
-  const saveManualGrade = (submissionId, questionId, value) => {
+  const saveManualGradeField = async (submissionId, questionId, value) => {
     const raw = Number(value)
     const safe = Number.isFinite(raw) ? raw : 0
-    updateSubmissionRecord(submissionId, prev => ({
-      ...prev,
-      manualGrades: {
-        ...(prev.manualGrades || {}),
-        [questionId]: safe
-      }
-    }))
+    if (!test) return
+    const updated = await saveManualGrade(test.id, submissionId, questionId, safe)
+    setSubmissions(prev => prev.map(item => (item.id === submissionId ? updated : item)))
     setRefreshTick(v => v + 1)
   }
 
-  const finalizeSubmission = (submission) => {
+  const finalizeCurrentSubmission = async (submission) => {
     if (!isPro) {
       alert('Finalize qilish Pro plan uchun ochiq. /plans bo`limida Pro ni yoqing.')
       return
@@ -96,15 +120,20 @@ export default function ReviewSubmissions() {
       finalScore = parsed
     }
 
-    updateSubmissionRecord(submission.id, prev => ({
-      ...prev,
-      finalScore,
-      status: 'completed',
-      reviewedAt: new Date().toISOString(),
-      manualGrades: prev.manualGrades || {}
-    }))
+    const updated = await finalizeSubmission(test.id, submission.id, test.testData.scoringType === 'rasch' ? finalScore : null)
+    setSubmissions(prev => prev.map(item => (item.id === submission.id ? updated : item)))
 
     setRefreshTick(v => v + 1)
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+        <div className="bg-white border border-slate-200 rounded-xl p-8 max-w-lg text-center">
+          <h1 className="text-2xl font-bold text-slate-800 mb-2">Yuklanmoqda...</h1>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -170,7 +199,7 @@ export default function ReviewSubmissions() {
                           min="0"
                           max={getQuestionPoints(question)}
                           value={submission.manualGrades?.[question.id] ?? ''}
-                          onChange={(e) => saveManualGrade(submission.id, question.id, e.target.value)}
+                          onChange={(e) => saveManualGradeField(submission.id, question.id, e.target.value)}
                           className="w-full px-3 py-2 border border-slate-300 rounded-lg"
                         />
                       </div>
@@ -185,7 +214,7 @@ export default function ReviewSubmissions() {
                 <span className="text-sm text-slate-700">Yakuniy ball: {submission.finalScore ?? '-'}</span>
                 <button
                   type="button"
-                  onClick={() => finalizeSubmission(submission)}
+                  onClick={() => finalizeCurrentSubmission(submission)}
                   className={`px-4 py-2 rounded-lg ${isPro ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-slate-200 text-slate-500 cursor-not-allowed'}`}
                 >
                   {isPro ? 'Saqlash va Yakunlash' : 'Pro talab qilinadi'}

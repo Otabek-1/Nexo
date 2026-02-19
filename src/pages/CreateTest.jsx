@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { createTestRecord, getTestById, getTests, updateTestRecord } from '../lib/testStore'
 import { FREE_LIMITS, PLAN_PRO, getCreatorPlan } from '../lib/subscription'
@@ -7,13 +7,22 @@ import RichContent from '../components/RichContent'
 import RichTextEditor from '../components/RichTextEditor'
 import { isRichContentEmpty } from '../lib/richContent'
 
+const toDateTimeLocal = (value) => {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  const localMs = date.getTime() - date.getTimezoneOffset() * 60 * 1000
+  return new Date(localMs).toISOString().slice(0, 16)
+}
+
 export default function CreateTest() {
   const navigate = useNavigate()
   const { id } = useParams()
-  const creatorPlan = getCreatorPlan()
+  const [creatorPlan, setCreatorPlan] = useState(getCreatorPlan())
   const isPro = creatorPlan === PLAN_PRO
-  const existingTests = useMemo(() => getTests(), [])
-  const editingTest = useMemo(() => (id ? getTestById(id) : null), [id])
+  const [existingTests, setExistingTests] = useState([])
+  const [editingTest, setEditingTest] = useState(null)
+  const [loading, setLoading] = useState(true)
   const isEditing = Boolean(editingTest)
   const emptyQuestion = {
     type: 'short-answer',
@@ -32,30 +41,18 @@ export default function CreateTest() {
 
   const [step, setStep] = useState('info')
   const [testData, setTestData] = useState({
-    title: editingTest?.testData?.title || '',
-    description: editingTest?.testData?.description || '',
-    startTime: editingTest?.testData?.startTime || '',
-    endTime: editingTest?.testData?.endTime || '',
-    duration: editingTest?.testData?.duration || '',
-    attemptsCount: editingTest?.testData?.attemptsCount || '1',
-    scoringType: editingTest?.testData?.scoringType || 'correct-incorrect',
-    testType: editingTest?.testData?.testType || 'exam'
+    title: '',
+    description: '',
+    startTime: '',
+    endTime: '',
+    duration: '',
+    attemptsCount: '1',
+    scoringType: 'correct-incorrect',
+    testType: 'exam'
   })
 
-  const [questions, setQuestions] = useState(editingTest?.questions || [])
-  const [participantFields, setParticipantFields] = useState(() => {
-    const configured = Array.isArray(editingTest?.testData?.participantFields) ? editingTest.testData.participantFields : []
-    if (configured.length === 0) {
-      return [defaultParticipantField]
-    }
-
-    const hasLockedFullName = configured.some(field => field.id === 'fullName')
-    if (hasLockedFullName) {
-      return configured.map(field => (field.id === 'fullName' ? { ...field, locked: true, required: true } : field))
-    }
-
-    return [defaultParticipantField, ...configured]
-  })
+  const [questions, setQuestions] = useState([])
+  const [participantFields, setParticipantFields] = useState([defaultParticipantField])
   const [newParticipantLabel, setNewParticipantLabel] = useState('')
   const [newParticipantType, setNewParticipantType] = useState('text')
   const [currentQuestion, setCurrentQuestion] = useState(emptyQuestion)
@@ -66,6 +63,59 @@ export default function CreateTest() {
     if (!createdTest) return ''
     return getPublicTestUrl(createdTest.id)
   }, [createdTest])
+
+  useEffect(() => {
+    let mounted = true
+    const load = async () => {
+      try {
+        setLoading(true)
+        const tests = await getTests()
+        if (!mounted) return
+        setExistingTests(Array.isArray(tests) ? tests : [])
+        setCreatorPlan(getCreatorPlan())
+
+        if (id) {
+          const found = await getTestById(id)
+          if (!mounted) return
+          setEditingTest(found)
+          if (found) {
+            setTestData({
+              title: found?.testData?.title || '',
+              description: found?.testData?.description || '',
+              startTime: toDateTimeLocal(found?.testData?.startTime),
+              endTime: toDateTimeLocal(found?.testData?.endTime),
+              duration: String(found?.testData?.duration || ''),
+              attemptsCount: String(found?.testData?.attemptsCount || '1'),
+              scoringType: found?.testData?.scoringType || 'correct-incorrect',
+              testType: found?.testData?.testType || 'exam'
+            })
+            setQuestions(found?.questions || [])
+            const configured = Array.isArray(found?.testData?.participantFields) ? found.testData.participantFields : []
+            if (configured.length === 0) {
+              setParticipantFields([defaultParticipantField])
+            } else {
+              const hasLockedFullName = configured.some(field => field.id === 'fullName')
+              if (hasLockedFullName) {
+                setParticipantFields(
+                  configured.map(field => (field.id === 'fullName' ? { ...field, locked: true, required: true } : field))
+                )
+              } else {
+                setParticipantFields([defaultParticipantField, ...configured])
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error('[CreateTest] load failed:', error)
+      } finally {
+        if (mounted) setLoading(false)
+      }
+    }
+    load()
+    return () => {
+      mounted = false
+    }
+  }, [id])
 
   const handleChange = (e) => {
     const { name, value } = e.target
@@ -312,7 +362,7 @@ export default function CreateTest() {
     setStep('questions')
   }
 
-  const finishCreating = () => {
+  const finishCreating = async () => {
     if (!isEditing && !isPro && existingTests.length >= FREE_LIMITS.activeTests) {
       alert(`Free planda ${FREE_LIMITS.activeTests} ta test limiti bor. Pro ni yoqing.`)
       return
@@ -337,12 +387,12 @@ export default function CreateTest() {
     }
 
     const saved = isEditing
-      ? updateTestRecord(editingTest.id, prev => ({
+      ? await updateTestRecord(editingTest.id, prev => ({
         ...prev,
         ...payload,
         creatorPlan: prev.creatorPlan || creatorPlan
       }))
-      : createTestRecord({ ...payload, creatorPlan })
+      : await createTestRecord({ ...payload, creatorPlan })
 
     if (!saved) {
       alert('Imtihonni saqlashda xatolik boldi')
@@ -360,6 +410,16 @@ export default function CreateTest() {
     } catch {
       alert('Linkni nusxalashda xatolik boldi')
     }
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+        <div className="bg-white border border-slate-200 rounded-xl p-8 max-w-lg text-center">
+          <h1 className="text-2xl font-bold text-slate-800 mb-2">Yuklanmoqda...</h1>
+        </div>
+      </div>
+    )
   }
 
   if (id && !editingTest) {

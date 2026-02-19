@@ -79,7 +79,7 @@ export default function RegisterForm() {
     setLoading(true)
 
     try {
-      const result = registerUser(formData.email, formData.password)
+      const result = await registerUser(formData.email, formData.password, formData.fullName)
 
       if (result.success) {
         setTimeout(() => {
