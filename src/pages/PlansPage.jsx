@@ -29,13 +29,12 @@ const CrossIcon = () => (
 export default function PlansPage() {
   const navigate = useNavigate()
   const [billingCycle, setBillingCycle] = useState('monthly')
+  const [upgradeModal, setUpgradeModal] = useState({ open: false, planType: '' })
 
   const isYearly = billingCycle === 'yearly'
 
-  const handleUpgrade = async (planType) => {
-    await setCreatorPlan(PLAN_PRO)
-    alert(`${planType} rejasi tanlandi. Demo muhiti uchun Pro aktiv qilindi.`)
-    navigate('/dashboard')
+  const handleUpgrade = (planType) => {
+    setUpgradeModal({ open: true, planType })
   }
 
   const handleGetStarted = async () => {
@@ -45,6 +44,7 @@ export default function PlansPage() {
 
   const proPriceLabel = isYearly ? '549,000 UZS / year' : '59,000 UZS / month'
   const proPlanType = isYearly ? 'pro_yearly' : 'pro_monthly'
+  const selectedPlanLabel = upgradeModal.planType === 'lifetime' ? 'Founder Lifetime' : 'Pro'
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -137,7 +137,7 @@ export default function PlansPage() {
               onClick={() => handleUpgrade(proPlanType)}
               className="mt-8 w-full rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-slate-800"
             >
-              Upgrade Now
+              Tarifni Yoqish
             </button>
           </article>
 
@@ -161,7 +161,7 @@ export default function PlansPage() {
               onClick={() => handleUpgrade('lifetime')}
               className="mt-8 w-full rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-amber-600"
             >
-              Upgrade Now
+              Tarifni Yoqish
             </button>
           </article>
         </section>
@@ -232,6 +232,47 @@ export default function PlansPage() {
           </div>
         </section>
       </main>
+
+      {upgradeModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 p-4">
+          <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-xl">
+            <h3 className="text-xl font-semibold text-slate-900">{selectedPlanLabel} tarifini yoqish</h3>
+            <p className="mt-2 text-sm text-slate-600">
+              To'lov tizimi to'liq ulanmaguncha tariflar qo'lda aktiv qilinadi.
+            </p>
+
+            <div className="mt-5 rounded-xl bg-slate-950 p-5 text-slate-100">
+              <p className="text-sm leading-7">
+                Siz <span className="font-semibold">{selectedPlanLabel}</span> tarifini yoqmoqchisiz.
+              </p>
+              <p className="mt-4 text-sm leading-7">Aktivatsiya qilish tartibi:</p>
+              <ol className="mt-2 list-decimal space-y-2 pl-5 text-sm leading-7">
+                <li>Telegram orqali biz bilan bog'laning</li>
+                <li>To'lov bo'yicha ma'lumotlarni yuboramiz</li>
+                <li>Hisobingiz bir necha daqiqada aktiv qilinadi</li>
+              </ol>
+            </div>
+
+            <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-end">
+              <a
+                href="https://t.me/i_am_nobody2038"
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center justify-center rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-sky-700"
+              >
+                Telegram orqali bog'lanish (@i_am_nobody2038)
+              </a>
+              <button
+                type="button"
+                onClick={() => setUpgradeModal({ open: false, planType: '' })}
+                className="inline-flex items-center justify-center rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+              >
+                Yopish
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
