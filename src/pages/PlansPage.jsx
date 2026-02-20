@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { PLAN_FREE, PLAN_PRO, setCreatorPlan } from '../lib/subscription'
+import { PLAN_FREE, setCreatorPlan } from '../lib/subscription'
 
 const CheckIcon = ({ muted = false }) => (
   <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full ${muted ? 'bg-slate-200 text-slate-500' : 'bg-emerald-100 text-emerald-700'}`}>
@@ -42,24 +42,24 @@ export default function PlansPage() {
     navigate('/dashboard')
   }
 
-  const proPriceLabel = isYearly ? '549,000 UZS / year' : '59,000 UZS / month'
+  const proPriceLabel = isYearly ? '549,000 UZS / yil' : '59,000 UZS / oy'
   const proPlanType = isYearly ? 'pro_yearly' : 'pro_monthly'
-  const selectedPlanLabel = upgradeModal.planType === 'lifetime' ? 'Founder Lifetime' : 'Pro'
+  const selectedPlanLabel = upgradeModal.planType === 'lifetime' ? 'Asoschi Umrbod' : 'Pro'
 
   return (
     <div className="min-h-screen bg-slate-50">
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-6 py-5">
           <div>
-            <h1 className="text-2xl font-semibold text-slate-900">Pricing</h1>
-            <p className="mt-1 text-sm text-slate-600">Simple plans for schools, teachers, and exam organizers.</p>
+            <h1 className="text-2xl font-semibold text-slate-900">Tariflar</h1>
+            <p className="mt-1 text-sm text-slate-600">Maktablar, o'qituvchilar va imtihon tashkilotchilari uchun sodda tariflar.</p>
           </div>
           <button
             type="button"
             onClick={() => navigate('/dashboard')}
             className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
           >
-            Dashboard
+            Boshqaruv paneli
           </button>
         </div>
       </header>
@@ -72,33 +72,33 @@ export default function PlansPage() {
               onClick={() => setBillingCycle('monthly')}
               className={`rounded-xl px-4 py-2 text-sm font-medium transition ${!isYearly ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}`}
             >
-              Monthly
+              Oylik
             </button>
             <button
               type="button"
               onClick={() => setBillingCycle('yearly')}
               className={`rounded-xl px-4 py-2 text-sm font-medium transition ${isYearly ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-slate-100'}`}
             >
-              Yearly
+              Yillik
             </button>
-            <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700">2 months free</span>
+            <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700">2 oy bepul</span>
           </div>
         </div>
 
         <section className="grid grid-cols-1 gap-6 lg:grid-cols-3">
           <article className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-lg font-semibold text-slate-900">Free</h2>
-            <p className="mt-1 text-sm text-slate-600">For trying out Nexo basics</p>
+            <h2 className="text-lg font-semibold text-slate-900">Bepul</h2>
+            <p className="mt-1 text-sm text-slate-600">Nexo asosiy imkoniyatlarini sinab ko'rish uchun</p>
             <p className="mt-5 text-3xl font-semibold text-slate-900">0 UZS</p>
-            <p className="mt-1 text-sm text-slate-500">Forever free</p>
+            <p className="mt-1 text-sm text-slate-500">Doimiy bepul</p>
 
             <ul className="mt-6 space-y-3 text-sm text-slate-700">
-              <li className="flex items-center gap-3"><CheckIcon />1 active test</li>
-              <li className="flex items-center gap-3"><CheckIcon />Up to 50 submissions</li>
-              <li className="flex items-center gap-3"><CheckIcon />Basic scoring (correct/incorrect)</li>
-              <li className="flex items-center gap-3"><CrossIcon />No Rasch scoring</li>
-              <li className="flex items-center gap-3"><CrossIcon />No advanced analytics</li>
-              <li className="flex items-center gap-3"><CheckIcon />Community support</li>
+              <li className="flex items-center gap-3"><CheckIcon />1 ta faol test</li>
+              <li className="flex items-center gap-3"><CheckIcon />50 tagacha topshirish</li>
+              <li className="flex items-center gap-3"><CheckIcon />Oddiy baholash (to'g'ri/noto'g'ri)</li>
+              <li className="flex items-center gap-3"><CrossIcon />Rasch baholash yo'q</li>
+              <li className="flex items-center gap-3"><CrossIcon />Kengaytirilgan tahlil yo'q</li>
+              <li className="flex items-center gap-3"><CheckIcon />Hamjamiyat yordami</li>
             </ul>
 
             <button
@@ -106,30 +106,30 @@ export default function PlansPage() {
               onClick={handleGetStarted}
               className="mt-8 w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-800 transition hover:bg-slate-100"
             >
-              Get Started
+              Boshlash
             </button>
           </article>
 
           <article className="relative rounded-2xl border-2 border-blue-600 bg-white p-6 shadow-md">
             <div className="absolute -top-3 left-5 rounded-full bg-blue-600 px-3 py-1 text-xs font-medium text-white">
-              Recommended
+              Tavsiya etiladi
             </div>
             <h2 className="text-lg font-semibold text-slate-900">Pro</h2>
-            <p className="mt-1 text-sm text-slate-600">For serious exam operations</p>
+            <p className="mt-1 text-sm text-slate-600">Professional imtihon jarayonlari uchun</p>
             <p className="mt-5 text-3xl font-semibold text-slate-900">{proPriceLabel}</p>
             {isYearly && (
               <div className="mt-2 inline-flex rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700">
-                2 months free
+                2 oy bepul
               </div>
             )}
 
             <ul className="mt-6 space-y-3 text-sm text-slate-700">
-              <li className="flex items-center gap-3"><CheckIcon />Unlimited tests</li>
-              <li className="flex items-center gap-3"><CheckIcon />Unlimited submissions</li>
-              <li className="flex items-center gap-3"><CheckIcon />Rasch scoring enabled</li>
-              <li className="flex items-center gap-3"><CheckIcon />Manual review system</li>
-              <li className="flex items-center gap-3"><CheckIcon />Leaderboard and advanced stats</li>
-              <li className="flex items-center gap-3"><CheckIcon />Priority support</li>
+              <li className="flex items-center gap-3"><CheckIcon />Cheksiz testlar</li>
+              <li className="flex items-center gap-3"><CheckIcon />Cheksiz topshirishlar</li>
+              <li className="flex items-center gap-3"><CheckIcon />Rasch baholash yoqilgan</li>
+              <li className="flex items-center gap-3"><CheckIcon />Qo'lda tekshirish tizimi</li>
+              <li className="flex items-center gap-3"><CheckIcon />Reyting jadvali va keng statistika</li>
+              <li className="flex items-center gap-3"><CheckIcon />Ustuvor yordam</li>
             </ul>
 
             <button
@@ -143,17 +143,17 @@ export default function PlansPage() {
 
           <article className="relative rounded-2xl border border-amber-300 bg-white p-6 shadow-sm">
             <div className="absolute -top-3 left-5 rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-800">
-              Limited to 30 users only
+              Faqat 30 ta foydalanuvchi uchun
             </div>
-            <h2 className="text-lg font-semibold text-slate-900">Founder Lifetime</h2>
-            <p className="mt-1 text-sm text-slate-600">Premium one-time founder access</p>
+            <h2 className="text-lg font-semibold text-slate-900">Asoschi Umrbod</h2>
+            <p className="mt-1 text-sm text-slate-600">Asoschilar uchun premium bir martalik kirish</p>
             <p className="mt-5 text-3xl font-semibold text-slate-900">990,000 UZS</p>
-            <p className="mt-1 text-sm text-slate-500">One-time payment. No recurring charges.</p>
+            <p className="mt-1 text-sm text-slate-500">Bir martalik to'lov. Oylik/yillik to'lov yo'q.</p>
 
             <ul className="mt-6 space-y-3 text-sm text-slate-700">
-              <li className="flex items-center gap-3"><CheckIcon />Everything in Pro</li>
-              <li className="flex items-center gap-3"><CheckIcon />Lifetime access</li>
-              <li className="flex items-center gap-3"><CheckIcon muted />Founder-only launch offer</li>
+              <li className="flex items-center gap-3"><CheckIcon />Pro tarifidagi barcha imkoniyatlar</li>
+              <li className="flex items-center gap-3"><CheckIcon />Umrbod foydalanish</li>
+              <li className="flex items-center gap-3"><CheckIcon muted />Faqat asoschilar uchun start taklifi</li>
             </ul>
 
             <button
@@ -167,47 +167,47 @@ export default function PlansPage() {
         </section>
 
         <section className="mt-12 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h3 className="text-lg font-semibold text-slate-900">Feature comparison</h3>
+          <h3 className="text-lg font-semibold text-slate-900">Imkoniyatlar taqqoslanishi</h3>
           <div className="mt-4 overflow-x-auto">
             <table className="min-w-full border-collapse text-sm">
               <thead>
                 <tr className="border-b border-slate-200 text-left text-slate-500">
-                  <th className="py-3 pr-4 font-medium">Feature</th>
-                  <th className="py-3 pr-4 font-medium">Free</th>
+                  <th className="py-3 pr-4 font-medium">Imkoniyat</th>
+                  <th className="py-3 pr-4 font-medium">Bepul</th>
                   <th className="py-3 pr-4 font-medium">Pro</th>
-                  <th className="py-3 font-medium">Founder Lifetime</th>
+                  <th className="py-3 font-medium">Asoschi Umrbod</th>
                 </tr>
               </thead>
               <tbody className="text-slate-700">
                 <tr className="border-b border-slate-100">
-                  <td className="py-3 pr-4">Tests</td>
-                  <td className="py-3 pr-4">1 active</td>
-                  <td className="py-3 pr-4">Unlimited</td>
-                  <td className="py-3">Unlimited</td>
+                  <td className="py-3 pr-4">Testlar</td>
+                  <td className="py-3 pr-4">1 ta faol</td>
+                  <td className="py-3 pr-4">Cheksiz</td>
+                  <td className="py-3">Cheksiz</td>
                 </tr>
                 <tr className="border-b border-slate-100">
-                  <td className="py-3 pr-4">Submissions</td>
-                  <td className="py-3 pr-4">50 max</td>
-                  <td className="py-3 pr-4">Unlimited</td>
-                  <td className="py-3">Unlimited</td>
+                  <td className="py-3 pr-4">Topshirishlar</td>
+                  <td className="py-3 pr-4">Maksimal 50</td>
+                  <td className="py-3 pr-4">Cheksiz</td>
+                  <td className="py-3">Cheksiz</td>
                 </tr>
                 <tr className="border-b border-slate-100">
-                  <td className="py-3 pr-4">Rasch scoring</td>
+                  <td className="py-3 pr-4">Rasch baholash</td>
                   <td className="py-3 pr-4"><CrossIcon /></td>
                   <td className="py-3 pr-4"><CheckIcon /></td>
                   <td className="py-3"><CheckIcon /></td>
                 </tr>
                 <tr className="border-b border-slate-100">
-                  <td className="py-3 pr-4">Manual review</td>
+                  <td className="py-3 pr-4">Qo'lda tekshirish</td>
                   <td className="py-3 pr-4"><CrossIcon /></td>
                   <td className="py-3 pr-4"><CheckIcon /></td>
                   <td className="py-3"><CheckIcon /></td>
                 </tr>
                 <tr>
-                  <td className="py-3 pr-4">Support</td>
-                  <td className="py-3 pr-4">Community</td>
-                  <td className="py-3 pr-4">Priority</td>
-                  <td className="py-3">Priority</td>
+                  <td className="py-3 pr-4">Yordam</td>
+                  <td className="py-3 pr-4">Hamjamiyat</td>
+                  <td className="py-3 pr-4">Ustuvor</td>
+                  <td className="py-3">Ustuvor</td>
                 </tr>
               </tbody>
             </table>
@@ -215,19 +215,19 @@ export default function PlansPage() {
         </section>
 
         <section className="mt-12 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <h3 className="text-lg font-semibold text-slate-900">FAQ</h3>
+          <h3 className="text-lg font-semibold text-slate-900">Ko'p so'raladigan savollar</h3>
           <div className="mt-4 space-y-3">
             <details className="rounded-xl border border-slate-200 p-4">
-              <summary className="cursor-pointer text-sm font-medium text-slate-900">Can I cancel anytime?</summary>
-              <p className="mt-2 text-sm text-slate-600">Yes. You can cancel your Pro subscription at any time from billing settings.</p>
+              <summary className="cursor-pointer text-sm font-medium text-slate-900">Istalgan payt bekor qilsam bo'ladimi?</summary>
+              <p className="mt-2 text-sm text-slate-600">Ha. Pro obunani billing sozlamalari orqali xohlagan payt to'xtatishingiz mumkin.</p>
             </details>
             <details className="rounded-xl border border-slate-200 p-4">
-              <summary className="cursor-pointer text-sm font-medium text-slate-900">What happens when subscription ends?</summary>
-              <p className="mt-2 text-sm text-slate-600">Your workspace moves to Free limits. Existing data is preserved, but Pro-only features are locked.</p>
+              <summary className="cursor-pointer text-sm font-medium text-slate-900">Obuna tugasa nima bo'ladi?</summary>
+              <p className="mt-2 text-sm text-slate-600">Ish joyingiz bepul limitlarga qaytadi. Mavjud ma'lumotlar saqlanadi, ammo Pro imkoniyatlari yopiladi.</p>
             </details>
             <details className="rounded-xl border border-slate-200 p-4">
-              <summary className="cursor-pointer text-sm font-medium text-slate-900">Is Lifetime really lifetime?</summary>
-              <p className="mt-2 text-sm text-slate-600">Yes. Founder Lifetime is a one-time purchase with no recurring charges for the included features.</p>
+              <summary className="cursor-pointer text-sm font-medium text-slate-900">"Umrbod" tarif rostdan ham umrbodmi?</summary>
+              <p className="mt-2 text-sm text-slate-600">Ha. Asoschi Umrbod bir martalik xarid bo'lib, undagi imkoniyatlar uchun qayta to'lov olinmaydi.</p>
             </details>
           </div>
         </section>
