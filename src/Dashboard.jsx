@@ -4,6 +4,7 @@ import { deleteTestRecord, getTests } from './lib/testStore'
 import { FREE_LIMITS, PLAN_PRO, getCreatorPlan, refreshCreatorPlan } from './lib/subscription'
 import { getPublicTestUrl } from './lib/urls'
 import { getCurrentUser, logoutUser, refreshCurrentUser } from './lib/auth'
+import AppFooter from './components/AppFooter'
 
 const formatDate = (isoDate) => {
   if (!isoDate) return '-'
@@ -107,8 +108,8 @@ export default function Dashboard() {
 
       <main className="max-w-6xl mx-auto px-8 py-12">
         <div className="mb-10">
-          <h2 className="text-2xl font-bold text-slate-800 mb-2">Salom, Otabek!</h2>
-          <p className="text-slate-600">Sizning imtihonlaringiz va testlaringiz bilan ishlang</p>
+          <h2 className="text-2xl font-bold text-slate-800 mb-2">Xush kelibsiz!</h2>
+          <p className="text-slate-600">Imtihonlaringiz va testlaringiz bilan ishlang</p>
         </div>
 
         <div className={`mb-6 rounded-lg border px-4 py-3 text-sm ${isPro ? 'border-emerald-300 bg-emerald-50 text-emerald-900' : 'border-amber-300 bg-amber-50 text-amber-900'}`}>
@@ -219,6 +220,7 @@ export default function Dashboard() {
           )}
         </div>
       </main>
+      <AppFooter />
     </div>
   )
 }

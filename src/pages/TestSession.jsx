@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { createSubmissionRecord, getAttemptsForParticipantValue, getTestById } from '../lib/testStore'
 import RichContent from '../components/RichContent'
+import AppFooter from '../components/AppFooter'
 import {
   answerTextToCells,
   cellsToAnswerText,
@@ -1015,6 +1016,7 @@ export default function TestSession() {
           </div>
         )}
       </main>
+      <AppFooter />
 
       {/* ── Confirm modal ── */}
       {showConfirm && (
