@@ -681,7 +681,7 @@ export default function TestSession() {
         <div className="bg-white border border-slate-200 rounded-xl p-5 mb-5">
           <h2 className="text-xl font-bold text-slate-800">{test.testData.title}</h2>
           {test.testData.description && (
-            <p className="text-slate-500 mt-1 text-sm">{test.testData.description}</p>
+            <RichContent html={test.testData.description} className="text-slate-600 mt-2 text-sm" />
           )}
           <div className="mt-3 flex flex-wrap gap-3">
             {test.testData.duration && (
