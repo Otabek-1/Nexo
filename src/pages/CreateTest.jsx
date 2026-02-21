@@ -57,7 +57,8 @@ export default function CreateTest() {
     points: '1',
     correctAnswer: '',
     subQuestions: ['', ''],
-    twoPartCorrectAnswers: ['', '']
+    twoPartCorrectAnswers: ['', ''],
+    twoPartPoints: ['1', '1']
   }
   const defaultParticipantField = {
     id: 'fullName',
@@ -219,7 +220,12 @@ export default function CreateTest() {
         ? (Array.isArray(prev.twoPartCorrectAnswers) && prev.twoPartCorrectAnswers.length === 2
           ? prev.twoPartCorrectAnswers
           : ['', ''])
-        : ['', '']
+        : ['', ''],
+      twoPartPoints: value === TWO_PART_WRITTEN_TYPE
+        ? (Array.isArray(prev.twoPartPoints) && prev.twoPartPoints.length === 2
+          ? prev.twoPartPoints
+          : ['1', '1'])
+        : ['1', '1']
     }))
   }
 
@@ -248,6 +254,15 @@ export default function CreateTest() {
         : []
       while (normalizedCorrectAnswers.length < 2) normalizedCorrectAnswers.push('')
       normalized.twoPartCorrectAnswers = normalizedCorrectAnswers
+
+      const normalizedPoints = Array.isArray(normalized.twoPartPoints)
+        ? normalized.twoPartPoints.map((item) => String(item ?? '').trim()).slice(0, 2)
+        : []
+      while (normalizedPoints.length < 2) normalizedPoints.push('1')
+      normalized.twoPartPoints = normalizedPoints.map((item) => {
+        const parsed = Number(item)
+        return String(Number.isFinite(parsed) && parsed > 0 ? parsed : 1)
+      })
     }
 
     return normalized
@@ -306,6 +321,16 @@ export default function CreateTest() {
         alert("Bu turda creator uchun a) va b) to'g'ri javoblarini kiriting")
         return
       }
+
+      if (testData.scoringType === 'rasch') {
+        const pointValues = Array.isArray(currentQuestion.twoPartPoints) ? currentQuestion.twoPartPoints : []
+        const firstPoint = Number(pointValues[0] || 0)
+        const secondPoint = Number(pointValues[1] || 0)
+        if (!Number.isFinite(firstPoint) || firstPoint <= 0 || !Number.isFinite(secondPoint) || secondPoint <= 0) {
+          alert("Raschda a) va b) uchun ball 0 dan katta bo'lishi kerak")
+          return
+        }
+      }
     }
 
     const normalizedQuestion = normalizeQuestionForSave()
@@ -340,7 +365,10 @@ export default function CreateTest() {
         : ['', ''],
       twoPartCorrectAnswers: Array.isArray(question.twoPartCorrectAnswers) && question.twoPartCorrectAnswers.length === 2
         ? [...question.twoPartCorrectAnswers]
-        : ['', '']
+        : ['', ''],
+      twoPartPoints: Array.isArray(question.twoPartPoints) && question.twoPartPoints.length === 2
+        ? question.twoPartPoints.map((item) => String(item))
+        : ['1', '1']
     })
     setEditingQuestionId(id)
   }
@@ -370,6 +398,18 @@ export default function CreateTest() {
       return {
         ...prev,
         twoPartCorrectAnswers: next
+      }
+    })
+  }
+
+  const handleTwoPartPointChange = (index, value) => {
+    setCurrentQuestion(prev => {
+      const next = Array.isArray(prev.twoPartPoints) ? [...prev.twoPartPoints] : ['1', '1']
+      while (next.length < 2) next.push('1')
+      next[index] = value
+      return {
+        ...prev,
+        twoPartPoints: next
       }
     })
   }
@@ -890,8 +930,30 @@ export default function CreateTest() {
                       placeholder="b) To'g'ri javob"
                       className="w-full px-4 py-2 border border-emerald-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                     />
+                    {testData.scoringType === 'rasch' && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <input
+                          type="number"
+                          min="0.1"
+                          step="0.1"
+                          value={currentQuestion.twoPartPoints?.[0] ?? '1'}
+                          onChange={(e) => handleTwoPartPointChange(0, e.target.value)}
+                          placeholder="a) Ball (Rasch)"
+                          className="w-full px-4 py-2 border border-purple-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        />
+                        <input
+                          type="number"
+                          min="0.1"
+                          step="0.1"
+                          value={currentQuestion.twoPartPoints?.[1] ?? '1'}
+                          onChange={(e) => handleTwoPartPointChange(1, e.target.value)}
+                          placeholder="b) Ball (Rasch)"
+                          className="w-full px-4 py-2 border border-purple-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        />
+                      </div>
+                    )}
                     <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 leading-relaxed">
-                      Eslatma: N, Sh, Ch, Ng kabi harf birikmalari alohida katakka yoziladi. O', G' bitta katakka yoziladi.
+                      Eslatma: Sh, Ch, Ng bitta katak emas (S+H, C+H, N+G alohida kataklarda yoziladi). O', G' esa bitta katakka yoziladi.
                       Sonlar alohida katakka yoziladi. Javob bir nechta so'z bo'lsa, so'zlar orasida bitta bo'sh katak qoldiriladi.
                     </div>
                   </div>
@@ -1056,6 +1118,11 @@ export default function CreateTest() {
                             {q.type === TWO_PART_WRITTEN_TYPE && (
                               <span>
                                 Kichik savollar: {(q.subQuestions || []).filter(Boolean).length}/2, To'g'ri javoblar: {((q.twoPartCorrectAnswers || []).filter(Boolean).length)}/2
+                              </span>
+                            )}
+                            {q.type === TWO_PART_WRITTEN_TYPE && testData.scoringType === 'rasch' && (
+                              <span>
+                                Rasch ball: a) {q.twoPartPoints?.[0] || 1}, b) {q.twoPartPoints?.[1] || 1}
                               </span>
                             )}
                           </div>

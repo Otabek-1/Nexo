@@ -1,7 +1,6 @@
 const APOSTROPHE_REGEX = /[\u02BB\u02BC\u2018\u2019`\u00B4]/g
 const SPACE_REGEX = /\s/
 
-const DIGRAPH_TOKENS = new Set(['sh', 'ch', 'ng'])
 const SINGLE_SYMBOL_TOKENS = new Set(['+', '-', '*', '/', '=', '.', ',', ':', ';', '(', ')', '[', ']', '{', '}', '?', '!'])
 
 const normalizeApostrophes = (value) => String(value || '').replace(APOSTROPHE_REGEX, "'")
@@ -29,13 +28,6 @@ export const tokenizeIntoCells = (value) => {
 
     if ((char === 'o' || char === 'g') && source[i + 1] === "'") {
       tokens.push(`${char}'`)
-      i += 2
-      continue
-    }
-
-    const pair = source.slice(i, i + 2)
-    if (DIGRAPH_TOKENS.has(pair)) {
-      tokens.push(pair)
       i += 2
       continue
     }
@@ -78,7 +70,6 @@ export const answerTextToCells = (text, cellCount = 28) => {
 export const normalizeCellToken = (raw) => {
   const value = normalizeCellAnswerText(raw).trim()
   if (!value) return ''
-  if (DIGRAPH_TOKENS.has(value)) return value
   if (value === "o'" || value === "g'") return value
   if (/^[a-z0-9]$/.test(value) || SINGLE_SYMBOL_TOKENS.has(value)) return value
   return ''

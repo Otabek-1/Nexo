@@ -86,6 +86,19 @@ function CellAnswerInput({ value, onChange, cells = 30 }) {
 
   const updateAt = (index, token) => {
     const next = [...tokens]
+    if (token && token !== ' ') {
+      // If user jumps ahead and types, keep skipped cells as explicit blanks.
+      let lastFilled = -1
+      for (let i = index - 1; i >= 0; i--) {
+        if (next[i]) {
+          lastFilled = i
+          break
+        }
+      }
+      for (let i = lastFilled + 1; i < index; i++) {
+        if (!next[i]) next[i] = ' '
+      }
+    }
     next[index] = token
     onChange(cellsToAnswerText(next))
   }
@@ -816,7 +829,8 @@ export default function TestSession() {
                   {question.type === TWO_PART_WRITTEN_TYPE && (
                     <div className="space-y-4">
                       <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 leading-relaxed">
-                        Eslatma: N, Sh, Ch, Ng alohida katak. O', G' bitta katak. Sonlar alohida katak.
+                        Eslatma: Sh, Ch, Ng bitta katak emas (S+H, C+H, N+G alohida kataklarda yoziladi). O', G' bitta katak.
+                        Sonlar alohida katak.
                         So'zlar orasida bitta bo'sh katak qoldiring.
                       </div>
                       {(() => {

@@ -1,4 +1,4 @@
-const TEST_BASE_URL = import.meta.env.VITE_TEST_BASE_URL || 'https://nexo-test.netlify.app'
+const TEST_BASE_URL = import.meta.env.VITE_TEST_BASE_URL || 'https://www.nexoo.space'
 
 const normalizeBaseUrl = (url) => String(url || '').replace(/\/+$/, '')
 
