@@ -59,7 +59,9 @@ export default function LandingPage() {
           </div>
         </div>
       </div>
-      <AppFooter />
+      <div className="fixed bottom-0 left-0 w-full h-max">
+        <AppFooter />
+      </div>
     </div>
   )
 }
