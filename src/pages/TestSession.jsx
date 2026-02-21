@@ -2,6 +2,16 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { createSubmissionRecord, getAttemptsForParticipantValue, getTestById } from '../lib/testStore'
 import RichContent from '../components/RichContent'
+import {
+  answerTextToCells,
+  cellsToAnswerText,
+  compareCellAnswers,
+  formatCellTokenDisplay,
+  normalizeCellToken,
+  tokenizeIntoCells
+} from '../lib/cellAnswer'
+
+const TWO_PART_WRITTEN_TYPE = 'two-part-written'
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -10,7 +20,11 @@ const getQuestionMaxScore = (question, scoringType) => {
     const parsed = Number(question.points)
     return Number.isFinite(parsed) && parsed > 0 ? parsed : 1
   }
-  if (question.type === 'multiple-choice' || question.type === 'true-false') return 1
+  if (
+    question.type === 'multiple-choice' ||
+    question.type === 'true-false' ||
+    question.type === TWO_PART_WRITTEN_TYPE
+  ) return 1
   return 0
 }
 
@@ -34,6 +48,93 @@ const formatCountdown = (ms) => {
 
 // sessionKey: sessionStorage-da saqlanadigan unique kalit
 const makeSessionKey = (testId) => `nexo_session_${testId}`
+
+const parseTwoPartAnswer = (value) => {
+  if (!value) return { first: '', second: '' }
+  try {
+    const parsed = JSON.parse(String(value))
+    return {
+      first: String(parsed?.first || ''),
+      second: String(parsed?.second || '')
+    }
+  } catch {
+    return { first: '', second: '' }
+  }
+}
+
+const stringifyTwoPartAnswer = (first, second) => JSON.stringify({
+  first: String(first || ''),
+  second: String(second || '')
+})
+
+const isQuestionAnswered = (question, rawAnswer) => {
+  if (question?.type === TWO_PART_WRITTEN_TYPE) {
+    const parsed = parseTwoPartAnswer(rawAnswer)
+    return tokenizeIntoCells(parsed.first).length > 0 && tokenizeIntoCells(parsed.second).length > 0
+  }
+  return rawAnswer !== undefined && rawAnswer !== ''
+}
+
+function CellAnswerInput({ value, onChange, cells = 30 }) {
+  const tokens = useMemo(() => answerTextToCells(value, cells), [value, cells])
+  const refs = useRef([])
+
+  const focusCell = (index) => {
+    const next = refs.current[index]
+    if (next) next.focus()
+  }
+
+  const updateAt = (index, token) => {
+    const next = [...tokens]
+    next[index] = token
+    onChange(cellsToAnswerText(next))
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <div className="grid gap-1.5 min-w-[520px]" style={{ gridTemplateColumns: 'repeat(15, minmax(0, 1fr))' }}>
+        {tokens.map((token, index) => (
+          <input
+            key={index}
+            ref={(el) => { refs.current[index] = el }}
+            type="text"
+            value={formatCellTokenDisplay(token)}
+            maxLength={2}
+            onChange={(e) => {
+              const normalized = normalizeCellToken(e.target.value)
+              updateAt(index, normalized)
+              if (normalized && index < tokens.length - 1) focusCell(index + 1)
+            }}
+            onKeyDown={(e) => {
+              if (e.key === ' ') {
+                e.preventDefault()
+                updateAt(index, ' ')
+                if (index < tokens.length - 1) focusCell(index + 1)
+                return
+              }
+              if (e.key === 'Backspace' && !tokens[index] && index > 0) {
+                e.preventDefault()
+                focusCell(index - 1)
+                return
+              }
+              if (e.key === 'ArrowLeft' && index > 0) {
+                e.preventDefault()
+                focusCell(index - 1)
+                return
+              }
+              if (e.key === 'ArrowRight' && index < tokens.length - 1) {
+                e.preventDefault()
+                focusCell(index + 1)
+              }
+            }}
+            className={`h-9 w-9 border rounded-sm text-center text-xs font-semibold uppercase focus:outline-none focus:ring-1 focus:ring-blue-500
+              ${token === ' ' ? 'bg-amber-50 border-amber-300' : 'bg-white border-slate-300'}`}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
 
 // ─── Countdown ring component ────────────────────────────────────────────────
 
@@ -83,7 +184,7 @@ function QuestionNav({ questions, answers, currentIdx, onGoto }) {
   return (
     <div className="flex flex-wrap gap-1.5">
       {questions.map((q, idx) => {
-        const isAnswered = answers[q.item.id] !== undefined && answers[q.item.id] !== ''
+        const isAnswered = isQuestionAnswered(q.item, answers[q.item.id])
         const isCurrent = idx === currentIdx
         return (
           <button
@@ -316,6 +417,16 @@ export default function TestSession() {
       if (q.type === 'multiple-choice' || q.type === 'true-false') {
         autoMaxScore += max
         if (String(answer) === String(q.correctAnswer)) autoScore += max
+        return
+      }
+
+      if (q.type === TWO_PART_WRITTEN_TYPE) {
+        autoMaxScore += max
+        const parsed = parseTwoPartAnswer(answer)
+        const firstCorrect = q.twoPartCorrectAnswers?.[0] || ''
+        const secondCorrect = q.twoPartCorrectAnswers?.[1] || ''
+        const isCorrect = compareCellAnswers(parsed.first, firstCorrect) && compareCellAnswers(parsed.second, secondCorrect)
+        if (isCorrect) autoScore += max
       }
     })
 
@@ -397,13 +508,21 @@ export default function TestSession() {
     setAnswers(prev => ({ ...prev, [questionId]: value }))
   }
 
+  const handleTwoPartAnswerChange = (questionId, part, value) => {
+    const current = parseTwoPartAnswer(answers[questionId])
+    const next = part === 'first'
+      ? stringifyTwoPartAnswer(value, current.second)
+      : stringifyTwoPartAnswer(current.first, value)
+    handleAnswerChange(questionId, next)
+  }
+
   const handleSubmitClick = () => setShowConfirm(true)
 
   const unansweredCount = useMemo(() => {
     if (!shuffledQuestions.length) return 0
     return shuffledQuestions.filter(({ item: q }) => {
       const a = answers[q.id]
-      return a === undefined || a === ''
+      return !isQuestionAnswered(q, a)
     }).length
   }, [shuffledQuestions, answers])
 
@@ -610,6 +729,7 @@ export default function TestSession() {
                       <span className="text-xs text-slate-400 font-medium">
                         {question.type === 'multiple-choice' ? "Ko'p tanlovli" :
                           question.type === 'true-false' ? "To'g'ri/Noto'g'ri" :
+                            question.type === TWO_PART_WRITTEN_TYPE ? '2 qismli yozma' :
                             question.type === 'essay' ? 'Yozma javob' : 'Qisqa javob'}
                       </span>
                     </div>
@@ -691,6 +811,38 @@ export default function TestSession() {
                       className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm resize-none"
                       placeholder={question.type === 'essay' ? 'Batafsil javobingizni yozing...' : 'Qisqa javob...'}
                     />
+                  )}
+
+                  {question.type === TWO_PART_WRITTEN_TYPE && (
+                    <div className="space-y-4">
+                      <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 leading-relaxed">
+                        Eslatma: N, Sh, Ch, Ng alohida katak. O', G' bitta katak. Sonlar alohida katak.
+                        So'zlar orasida bitta bo'sh katak qoldiring.
+                      </div>
+                      {(() => {
+                        const twoPart = parseTwoPartAnswer(answers[question.id])
+                        const firstLabel = question.subQuestions?.[0] || 'a) Birinchi javob'
+                        const secondLabel = question.subQuestions?.[1] || 'b) Ikkinchi javob'
+                        return (
+                          <>
+                            <div>
+                              <label className="block text-sm font-medium text-slate-700 mb-2">{firstLabel}</label>
+                              <CellAnswerInput
+                                value={twoPart.first}
+                                onChange={(next) => handleTwoPartAnswerChange(question.id, 'first', next)}
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-slate-700 mb-2">{secondLabel}</label>
+                              <CellAnswerInput
+                                value={twoPart.second}
+                                onChange={(next) => handleTwoPartAnswerChange(question.id, 'second', next)}
+                              />
+                            </div>
+                          </>
+                        )
+                      })()}
+                    </div>
                   )}
 
                   {/* Prev / Next navigation */}

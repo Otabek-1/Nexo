@@ -25,6 +25,7 @@ export const ROUTES = {
 // Question types
 export const QUESTION_TYPES = {
   SHORT_ANSWER: 'short-answer',
+  TWO_PART_WRITTEN: 'two-part-written',
   MULTIPLE_CHOICE: 'multiple-choice',
   TRUE_FALSE: 'true-false',
   ESSAY: 'essay'

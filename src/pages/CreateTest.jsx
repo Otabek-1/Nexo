@@ -6,6 +6,7 @@ import { getPublicTestUrl } from '../lib/urls'
 import RichContent from '../components/RichContent'
 import RichTextEditor from '../components/RichTextEditor'
 import { isRichContentEmpty } from '../lib/richContent'
+import { normalizeCellAnswerText, tokenizeIntoCells } from '../lib/cellAnswer'
 
 const toDateTimeLocal = (value) => {
   if (!value) return ''
@@ -15,7 +16,32 @@ const toDateTimeLocal = (value) => {
   return new Date(localMs).toISOString().slice(0, 16)
 }
 
+const toUtcISOString = (localDateTimeValue) => {
+  if (!localDateTimeValue) return ''
+  const date = new Date(localDateTimeValue)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toISOString()
+}
+
+const formatApiError = (error) => {
+  const detail = error?.payload?.detail
+  if (typeof detail === 'string' && detail.trim()) return detail
+  if (Array.isArray(detail) && detail.length > 0) {
+    return detail
+      .map((item) => {
+        const path = Array.isArray(item?.loc) ? item.loc.join('.') : ''
+        const msg = item?.msg || ''
+        return path ? `${path}: ${msg}` : msg
+      })
+      .filter(Boolean)
+      .join('\n')
+  }
+  if (typeof error?.message === 'string' && error.message.trim()) return error.message
+  return 'Imtihonni saqlashda xatolik yuz berdi'
+}
+
 export default function CreateTest() {
+  const TWO_PART_WRITTEN_TYPE = 'two-part-written'
   const navigate = useNavigate()
   const { id } = useParams()
   const [creatorPlan, setCreatorPlan] = useState(getCreatorPlan())
@@ -29,7 +55,9 @@ export default function CreateTest() {
     content: '',
     options: [],
     points: '1',
-    correctAnswer: ''
+    correctAnswer: '',
+    subQuestions: ['', ''],
+    twoPartCorrectAnswers: ['', '']
   }
   const defaultParticipantField = {
     id: 'fullName',
@@ -183,7 +211,15 @@ export default function CreateTest() {
       ...prev,
       type: value,
       options: value === 'multiple-choice' ? prev.options : [],
-      correctAnswer: ''
+      correctAnswer: '',
+      subQuestions: value === TWO_PART_WRITTEN_TYPE
+        ? (Array.isArray(prev.subQuestions) && prev.subQuestions.length === 2 ? prev.subQuestions : ['', ''])
+        : ['', ''],
+      twoPartCorrectAnswers: value === TWO_PART_WRITTEN_TYPE
+        ? (Array.isArray(prev.twoPartCorrectAnswers) && prev.twoPartCorrectAnswers.length === 2
+          ? prev.twoPartCorrectAnswers
+          : ['', ''])
+        : ['', '']
     }))
   }
 
@@ -199,6 +235,19 @@ export default function CreateTest() {
       const cleanedOptions = normalized.options.map(opt => opt.trim()).filter(Boolean)
       normalized.options = cleanedOptions
       normalized.correctAnswer = String(Number(normalized.correctAnswer))
+    }
+    if (normalized.type === TWO_PART_WRITTEN_TYPE) {
+      const normalizedSubQuestions = Array.isArray(normalized.subQuestions)
+        ? normalized.subQuestions.map(item => String(item || '').trim()).slice(0, 2)
+        : []
+      while (normalizedSubQuestions.length < 2) normalizedSubQuestions.push('')
+      normalized.subQuestions = normalizedSubQuestions
+
+      const normalizedCorrectAnswers = Array.isArray(normalized.twoPartCorrectAnswers)
+        ? normalized.twoPartCorrectAnswers.map(item => normalizeCellAnswerText(item).trim()).slice(0, 2)
+        : []
+      while (normalizedCorrectAnswers.length < 2) normalizedCorrectAnswers.push('')
+      normalized.twoPartCorrectAnswers = normalizedCorrectAnswers
     }
 
     return normalized
@@ -241,6 +290,23 @@ export default function CreateTest() {
         return
       }
     }
+    if (currentQuestion.type === TWO_PART_WRITTEN_TYPE) {
+      const parts = Array.isArray(currentQuestion.subQuestions) ? currentQuestion.subQuestions : []
+      const first = String(parts[0] || '').trim()
+      const second = String(parts[1] || '').trim()
+      if (!first || !second) {
+        alert('Bu turda 2 ta kichik savol matnini toldirish majburiy')
+        return
+      }
+
+      const corrects = Array.isArray(currentQuestion.twoPartCorrectAnswers) ? currentQuestion.twoPartCorrectAnswers : []
+      const firstCorrect = String(corrects[0] || '')
+      const secondCorrect = String(corrects[1] || '')
+      if (tokenizeIntoCells(firstCorrect).length === 0 || tokenizeIntoCells(secondCorrect).length === 0) {
+        alert("Bu turda creator uchun a) va b) to'g'ri javoblarini kiriting")
+        return
+      }
+    }
 
     const normalizedQuestion = normalizeQuestionForSave()
     const payload = editingQuestionId
@@ -268,7 +334,13 @@ export default function CreateTest() {
 
     setCurrentQuestion({
       ...question,
-      options: Array.isArray(question.options) ? [...question.options] : []
+      options: Array.isArray(question.options) ? [...question.options] : [],
+      subQuestions: Array.isArray(question.subQuestions) && question.subQuestions.length === 2
+        ? [...question.subQuestions]
+        : ['', ''],
+      twoPartCorrectAnswers: Array.isArray(question.twoPartCorrectAnswers) && question.twoPartCorrectAnswers.length === 2
+        ? [...question.twoPartCorrectAnswers]
+        : ['', '']
     })
     setEditingQuestionId(id)
   }
@@ -276,6 +348,30 @@ export default function CreateTest() {
   const cancelEditQuestion = () => {
     setEditingQuestionId(null)
     setCurrentQuestion(emptyQuestion)
+  }
+
+  const handleSubQuestionChange = (index, value) => {
+    setCurrentQuestion(prev => {
+      const next = Array.isArray(prev.subQuestions) ? [...prev.subQuestions] : ['', '']
+      while (next.length < 2) next.push('')
+      next[index] = value
+      return {
+        ...prev,
+        subQuestions: next
+      }
+    })
+  }
+
+  const handleTwoPartCorrectAnswerChange = (index, value) => {
+    setCurrentQuestion(prev => {
+      const next = Array.isArray(prev.twoPartCorrectAnswers) ? [...prev.twoPartCorrectAnswers] : ['', '']
+      while (next.length < 2) next.push('')
+      next[index] = value
+      return {
+        ...prev,
+        twoPartCorrectAnswers: next
+      }
+    })
   }
 
   const handleAddOption = () => {
@@ -381,25 +477,32 @@ export default function CreateTest() {
     const payload = {
       testData: {
         ...testData,
+        startTime: toUtcISOString(testData.startTime),
+        endTime: toUtcISOString(testData.endTime),
         participantFields: normalizedFields
       },
       questions
     }
 
-    const saved = isEditing
-      ? await updateTestRecord(editingTest.id, prev => ({
-        ...prev,
-        ...payload,
-        creatorPlan: prev.creatorPlan || creatorPlan
-      }))
-      : await createTestRecord({ ...payload, creatorPlan })
+    try {
+      const saved = isEditing
+        ? await updateTestRecord(editingTest.id, prev => ({
+          ...prev,
+          ...payload,
+          creatorPlan: prev.creatorPlan || creatorPlan
+        }))
+        : await createTestRecord({ ...payload, creatorPlan })
 
-    if (!saved) {
-      alert('Imtihonni saqlashda xatolik boldi')
-      return
+      if (!saved) {
+        alert('Imtihonni saqlashda xatolik boldi')
+        return
+      }
+
+      setCreatedTest(saved)
+    } catch (error) {
+      console.error('[CreateTest] save failed:', error)
+      alert(formatApiError(error))
     }
-
-    setCreatedTest(saved)
   }
 
   const copyShareLink = async () => {
@@ -727,6 +830,7 @@ export default function CreateTest() {
                   className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
                 >
                   <option value="short-answer">Qisqa Javob</option>
+                  <option value={TWO_PART_WRITTEN_TYPE}>2 qismli yozma (a,b)</option>
                   <option value="multiple-choice">Kop Variantli</option>
                   <option value="essay">Yozma Javob (Essay)</option>
                   <option value="true-false">Togri/Notogri</option>
@@ -748,6 +852,51 @@ export default function CreateTest() {
                   <RichContent html={currentQuestion.content} className="text-sm text-slate-800" />
                 </div>
               </div>
+
+              {currentQuestion.type === TWO_PART_WRITTEN_TYPE && (
+                <div className="rounded-lg border border-slate-200 p-4 space-y-3">
+                  <p className="text-sm font-medium text-slate-700">Kichik savollar (2 ta)</p>
+                  <input
+                    type="text"
+                    value={currentQuestion.subQuestions?.[0] ?? ''}
+                    onChange={(e) => handleSubQuestionChange(0, e.target.value)}
+                    placeholder="a) Birinchi kichik savol"
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                  <input
+                    type="text"
+                    value={currentQuestion.subQuestions?.[1] ?? ''}
+                    onChange={(e) => handleSubQuestionChange(1, e.target.value)}
+                    placeholder="b) Ikkinchi kichik savol"
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                  <p className="text-xs text-slate-500">
+                    Ishtirokchiga umumiy savol matni bilan birga a) va b) alohida javob maydoni chiqadi.
+                  </p>
+
+                  <div className="pt-3 border-t border-slate-200 space-y-3">
+                    <p className="text-sm font-medium text-slate-700">Creator uchun to'g'ri javoblar</p>
+                    <input
+                      type="text"
+                      value={currentQuestion.twoPartCorrectAnswers?.[0] ?? ''}
+                      onChange={(e) => handleTwoPartCorrectAnswerChange(0, e.target.value)}
+                      placeholder="a) To'g'ri javob"
+                      className="w-full px-4 py-2 border border-emerald-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                    />
+                    <input
+                      type="text"
+                      value={currentQuestion.twoPartCorrectAnswers?.[1] ?? ''}
+                      onChange={(e) => handleTwoPartCorrectAnswerChange(1, e.target.value)}
+                      placeholder="b) To'g'ri javob"
+                      className="w-full px-4 py-2 border border-emerald-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                    />
+                    <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 leading-relaxed">
+                      Eslatma: N, Sh, Ch, Ng kabi harf birikmalari alohida katakka yoziladi. O', G' bitta katakka yoziladi.
+                      Sonlar alohida katakka yoziladi. Javob bir nechta so'z bo'lsa, so'zlar orasida bitta bo'sh katak qoldiriladi.
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {currentQuestion.type === 'multiple-choice' && (
                 <div>
@@ -886,6 +1035,7 @@ export default function CreateTest() {
                           <div className="flex gap-4 text-sm text-slate-600 flex-wrap">
                             <span className="bg-slate-100 px-2 py-1 rounded">
                               {q.type === 'short-answer' ? 'Qisqa Javob' :
+                                q.type === TWO_PART_WRITTEN_TYPE ? '2 qismli yozma' :
                                 q.type === 'multiple-choice' ? 'Kop Variantli' :
                                   q.type === 'essay' ? 'Yozma Javob' :
                                     'Togri/Notogri'}
@@ -901,6 +1051,11 @@ export default function CreateTest() {
                             {q.type === 'true-false' && (
                               <span>
                                 Togri javob: {q.correctAnswer === 'true' ? 'Togri' : 'Notogri'}
+                              </span>
+                            )}
+                            {q.type === TWO_PART_WRITTEN_TYPE && (
+                              <span>
+                                Kichik savollar: {(q.subQuestions || []).filter(Boolean).length}/2, To'g'ri javoblar: {((q.twoPartCorrectAnswers || []).filter(Boolean).length)}/2
                               </span>
                             )}
                           </div>
