@@ -301,16 +301,40 @@ export default function TestSession() {
     if (!test) return []
     const configured = Array.isArray(test.testData?.participantFields)
       ? test.testData.participantFields : []
+    const hasAttempts = Boolean(test.testData?.attemptsEnabled)
     const hasFullName = configured.some(f => f.id === 'fullName')
+    const hasPhone = configured.some(f => f.id === 'phone')
     if (configured.length === 0) {
       return [
         { id: 'fullName', label: 'Full Name', type: 'text', required: true, locked: true },
-        { id: 'phone', label: 'Phone', type: 'tel', required: true, locked: false }
+        { id: 'phone', label: 'Phone', type: 'tel', required: hasAttempts, locked: hasAttempts }
       ]
     }
-    return hasFullName
+    const base = hasFullName
       ? configured
       : [{ id: 'fullName', label: 'Full Name', type: 'text', required: true, locked: true }, ...configured]
+
+    if (!hasAttempts) return base
+
+    const normalizedBase = base.map((field) => (
+      field.id === 'phone'
+        ? { ...field, type: 'tel', required: true, locked: true, label: field.label || 'Phone' }
+        : field
+    ))
+
+    if (hasPhone) {
+      const fullNameField = normalizedBase.find((field) => field.id === 'fullName') ||
+        { id: 'fullName', label: 'Full Name', type: 'text', required: true, locked: true }
+      const phoneField = normalizedBase.find((field) => field.id === 'phone') ||
+        { id: 'phone', label: 'Phone', type: 'tel', required: true, locked: true }
+      const rest = normalizedBase.filter((field) => field.id !== 'fullName' && field.id !== 'phone')
+      return [fullNameField, phoneField, ...rest]
+    }
+
+    const fullNameField = normalizedBase.find((field) => field.id === 'fullName') ||
+      { id: 'fullName', label: 'Full Name', type: 'text', required: true, locked: true }
+    const rest = normalizedBase.filter((field) => field.id !== 'fullName')
+    return [fullNameField, { id: 'phone', label: 'Phone', type: 'tel', required: true, locked: true }, ...rest]
   }, [test])
 
   // ── States ──
@@ -326,6 +350,7 @@ export default function TestSession() {
 
   // ── Shuffled questions (session davomida barqaror) ──
   const [shuffledQuestions, setShuffledQuestions] = useState([])
+  const attemptsEnabled = Boolean(test?.testData?.attemptsEnabled)
 
   const autoSubmitRef = useRef(false)
   const sessionKey = useMemo(() => (test ? makeSessionKey(test.id) : null), [test])
@@ -444,6 +469,9 @@ export default function TestSession() {
     })
 
     const status = requiresManualReview ? 'pending_review' : 'completed'
+    const attemptValue = attemptsEnabled
+      ? String(participantValues.phone || '').trim()
+      : String(participantValues.fullName || '').trim()
     const submission = {
       id: crypto.randomUUID(),
       testId: test.id,
@@ -451,7 +479,7 @@ export default function TestSession() {
         fullName: participantValues.fullName || '',
         phone: participantValues.phone || '',
         fields: participantValues,
-        attemptValue: participantValues.fullName || ''
+        attemptValue
       },
       answers: answersByQuestion,
       autoScore,
@@ -463,13 +491,22 @@ export default function TestSession() {
       reviewedAt: null,
     }
 
-    const saved = await createSubmissionRecord(submission)
+    let saved = null
+    try {
+      saved = await createSubmissionRecord(submission)
+    } catch (error) {
+      autoSubmitRef.current = false
+      const reason = error?.payload?.detail || error?.message || "Testni topshirishda xatolik yuz berdi"
+      alert(String(reason))
+      setAutoSubmitting(false)
+      return
+    }
     // Mark session as done
     try { sessionStorage.removeItem(sessionKey) } catch { }
     setSubmitted(saved || submission)
     setShowConfirm(false)
     setAutoSubmitting(false)
-  }, [test, answers, participantValues, requiresManualReview, sessionKey])
+  }, [test, answers, participantValues, requiresManualReview, sessionKey, attemptsEnabled])
 
   useEffect(() => {
     if (!started || submitted || !durationEndTs) return
@@ -495,13 +532,33 @@ export default function TestSession() {
       normalizedParticipant[field.id] = value
     }
 
-    const attemptValue = normalizedParticipant.fullName || ''
-    if (!attemptValue) { alert('Full Name maydoni majburiy'); return }
-
-    const attemptCount = await getAttemptsForParticipantValue(test.id, attemptValue)
-    if (attemptCount >= Number(test.testData.attemptsCount)) {
-      alert('Bu participant uchun urinish limiti tugagan')
+    const attemptValue = attemptsEnabled
+      ? String(normalizedParticipant.phone || '').trim()
+      : (normalizedParticipant.fullName || '')
+    if (!attemptValue) {
+      alert(attemptsEnabled ? 'Telefon raqam maydoni majburiy' : 'Full Name maydoni majburiy')
       return
+    }
+
+    if (attemptsEnabled) {
+      const phoneRegex = /^\+[1-9]\d{7,14}$/
+      if (!phoneRegex.test(attemptValue)) {
+        alert("Telefon raqam to'liq davlat kodi bilan kiriting. Masalan: +998901234567")
+        return
+      }
+
+      let validation = null
+      try {
+        validation = await getAttemptsForParticipantValue(test.id, attemptValue)
+      } catch (error) {
+        const reason = error?.payload?.detail || error?.message || 'Urinishni tekshirishda xatolik'
+        alert(String(reason))
+        return
+      }
+      if (!validation?.allowed) {
+        alert(validation?.reason || 'Urinish limiti tugagan')
+        return
+      }
     }
 
     // Savollarni aralashtirish
@@ -632,9 +689,11 @@ export default function TestSession() {
                 ⏱ {test.testData.duration} daqiqa
               </span>
             )}
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-50 border border-slate-200 text-slate-600 text-xs font-medium">
-              🔄 {test.testData.attemptsCount} ta urinish
-            </span>
+            {attemptsEnabled && (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-50 border border-slate-200 text-slate-600 text-xs font-medium">
+                🔄 {test.testData.attemptsCount} ta urinish
+              </span>
+            )}
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-50 border border-slate-200 text-slate-600 text-xs font-medium">
               📊 {test.testData.scoringType === 'rasch' ? 'Rasch Model' : 'Klassik'}
             </span>
@@ -697,6 +756,12 @@ export default function TestSession() {
                 )}
               </div>
             ))}
+            {attemptsEnabled && (
+              <div className="rounded-lg bg-blue-50 border border-blue-200 p-3 text-xs text-blue-800">
+                Bu testda kirish uchun Telegram bot orqali ro'yxatdan o'tgan telefon raqamingizni
+                <strong> to'liq davlat kodi bilan</strong> kiriting (masalan: +998901234567).
+              </div>
+            )}
             {durationMs > 0 && (
               <div className="rounded-lg bg-amber-50 border border-amber-200 p-3 text-xs text-amber-800 flex items-start gap-2">
                 <span className="text-base">⚠️</span>

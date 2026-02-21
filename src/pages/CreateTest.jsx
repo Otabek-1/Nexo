@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { createTestRecord, getTestById, getTests, updateTestRecord } from '../lib/testStore'
+import { createTestRecord, getTelegramRegistrationLink, getTestById, getTests, updateTestRecord } from '../lib/testStore'
 import { FREE_LIMITS, PLAN_PRO, getCreatorPlan } from '../lib/subscription'
 import { getPublicTestUrl } from '../lib/urls'
 import RichContent from '../components/RichContent'
@@ -75,7 +75,9 @@ export default function CreateTest() {
     startTime: '',
     endTime: '',
     duration: '',
+    attemptsEnabled: false,
     attemptsCount: '1',
+    registrationWindowHours: '24',
     scoringType: 'correct-incorrect',
     testType: 'exam'
   })
@@ -87,6 +89,7 @@ export default function CreateTest() {
   const [currentQuestion, setCurrentQuestion] = useState(emptyQuestion)
   const [editingQuestionId, setEditingQuestionId] = useState(null)
   const [createdTest, setCreatedTest] = useState(null)
+  const [telegramRegistrationLink, setTelegramRegistrationLink] = useState('')
 
   const shareLink = useMemo(() => {
     if (!createdTest) return ''
@@ -114,7 +117,9 @@ export default function CreateTest() {
               startTime: toDateTimeLocal(found?.testData?.startTime),
               endTime: toDateTimeLocal(found?.testData?.endTime),
               duration: String(found?.testData?.duration || ''),
+              attemptsEnabled: Boolean(found?.testData?.attemptsEnabled),
               attemptsCount: String(found?.testData?.attemptsCount || '1'),
+              registrationWindowHours: String(found?.testData?.registrationWindowHours || '24'),
               scoringType: found?.testData?.scoringType || 'correct-incorrect',
               testType: found?.testData?.testType || 'exam'
             })
@@ -147,10 +152,10 @@ export default function CreateTest() {
   }, [id])
 
   const handleChange = (e) => {
-    const { name, value } = e.target
+    const { name, value, type, checked } = e.target
     setTestData(prev => ({
       ...prev,
-      [name]: value
+      [name]: type === 'checkbox' ? checked : value
     }))
   }
 
@@ -453,7 +458,9 @@ export default function CreateTest() {
 
     const title = testData.title.trim()
     const duration = Number(testData.duration)
+    const attemptsEnabled = Boolean(testData.attemptsEnabled)
     const attempts = Number(testData.attemptsCount)
+    const registrationWindowHours = Number(testData.registrationWindowHours)
     const startMs = new Date(testData.startTime).getTime()
     const endMs = new Date(testData.endTime).getTime()
 
@@ -478,9 +485,15 @@ export default function CreateTest() {
       return
     }
 
-    if (!Number.isFinite(attempts) || attempts < 1) {
-      alert('Urinish soni 1 dan kichik bolmasligi kerak')
-      return
+    if (attemptsEnabled) {
+      if (!Number.isFinite(attempts) || attempts < 1) {
+        alert('Urinish soni 1 dan kichik bolmasligi kerak')
+        return
+      }
+      if (!Number.isFinite(registrationWindowHours) || registrationWindowHours < 1) {
+        alert("Registratsiya muddati (soat) 1 dan kichik bo'lmasligi kerak")
+        return
+      }
     }
 
     if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs) {
@@ -519,6 +532,10 @@ export default function CreateTest() {
         ...testData,
         startTime: toUtcISOString(testData.startTime),
         endTime: toUtcISOString(testData.endTime),
+        attemptsCount: testData.attemptsEnabled ? String(testData.attemptsCount) : '1',
+        registrationWindowHours: testData.attemptsEnabled
+          ? Number(testData.registrationWindowHours)
+          : null,
         participantFields: normalizedFields
       },
       questions
@@ -539,6 +556,16 @@ export default function CreateTest() {
       }
 
       setCreatedTest(saved)
+      if (saved?.testData?.attemptsEnabled) {
+        try {
+          const link = await getTelegramRegistrationLink(saved.id)
+          setTelegramRegistrationLink(link)
+        } catch {
+          setTelegramRegistrationLink('')
+        }
+      } else {
+        setTelegramRegistrationLink('')
+      }
     } catch (error) {
       console.error('[CreateTest] save failed:', error)
       alert(formatApiError(error))
@@ -552,6 +579,16 @@ export default function CreateTest() {
       alert('Link nusxalandi')
     } catch {
       alert('Linkni nusxalashda xatolik boldi')
+    }
+  }
+
+  const copyTelegramLink = async () => {
+    if (!telegramRegistrationLink) return
+    try {
+      await navigator.clipboard.writeText(telegramRegistrationLink)
+      alert('Telegram registratsiya linki nusxalandi')
+    } catch {
+      alert('Telegram linkni nusxalashda xatolik boldi')
     }
   }
 
@@ -768,20 +805,61 @@ export default function CreateTest() {
                   />
                 </div>
 
-                <div>
-                  <label htmlFor="attemptsCount" className="block text-sm font-medium text-slate-700 mb-2">
-                    Urinish Soni *
+                <div className="md:col-span-2 rounded-lg border border-slate-200 p-4">
+                  <label className="inline-flex items-start gap-3">
+                    <input
+                      type="checkbox"
+                      id="attemptsEnabled"
+                      name="attemptsEnabled"
+                      checked={Boolean(testData.attemptsEnabled)}
+                      onChange={handleChange}
+                      className="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span>
+                      <span className="block text-sm font-semibold text-slate-800">Attempt limitni yoqish</span>
+                      <span className="block text-xs text-slate-600 mt-1">
+                        Yoqilsa, userlar Telegram bot orqali ro'yxatdan o'tib telefon raqami bilan kiradi.
+                      </span>
+                    </span>
                   </label>
-                  <input
-                    type="number"
-                    id="attemptsCount"
-                    name="attemptsCount"
-                    value={testData.attemptsCount}
-                    onChange={handleChange}
-                    min="1"
-                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    required
-                  />
+
+                  {testData.attemptsEnabled && (
+                    <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label htmlFor="attemptsCount" className="block text-sm font-medium text-slate-700 mb-2">
+                          Urinish Soni *
+                        </label>
+                        <input
+                          type="number"
+                          id="attemptsCount"
+                          name="attemptsCount"
+                          value={testData.attemptsCount}
+                          onChange={handleChange}
+                          min="1"
+                          className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          required={Boolean(testData.attemptsEnabled)}
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="registrationWindowHours" className="block text-sm font-medium text-slate-700 mb-2">
+                          Registratsiya muddati (soat) *
+                        </label>
+                        <input
+                          type="number"
+                          id="registrationWindowHours"
+                          name="registrationWindowHours"
+                          value={testData.registrationWindowHours}
+                          onChange={handleChange}
+                          min="1"
+                          className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          required={Boolean(testData.attemptsEnabled)}
+                        />
+                        <p className="mt-2 text-xs text-slate-500">
+                          Registratsiya test yaratilgan vaqtdan boshlab shu soat davomida ochiq bo'ladi.
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -1190,6 +1268,14 @@ export default function CreateTest() {
             <div className="rounded-lg border border-slate-300 bg-slate-50 p-3 break-all text-sm text-slate-800">
               {shareLink}
             </div>
+            {createdTest?.testData?.attemptsEnabled && (
+              <div className="mt-4">
+                <p className="text-slate-600 mb-2 text-sm">Telegram registratsiya linki:</p>
+                <div className="rounded-lg border border-slate-300 bg-slate-50 p-3 break-all text-sm text-slate-800">
+                  {telegramRegistrationLink || "Bot link hali tayyor emas. Keyinroq qayta urinib ko'ring."}
+                </div>
+              </div>
+            )}
 
             <div className="mt-4 flex flex-wrap gap-3">
               <button
@@ -1206,6 +1292,15 @@ export default function CreateTest() {
               >
                 Linkni Ochish
               </button>
+              {createdTest?.testData?.attemptsEnabled && telegramRegistrationLink && (
+                <button
+                  type="button"
+                  onClick={copyTelegramLink}
+                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition"
+                >
+                  Telegram Linkni Nusxalash
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => navigate('/dashboard')}

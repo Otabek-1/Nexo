@@ -81,24 +81,29 @@ export const getSubmissionsByTestId = async (testId) => {
 
 export const getAttemptsForPhone = async (testId, phone) => {
   const normalized = String(phone || '').trim()
-  if (!normalized) return 0
-  const result = await apiRequest(`/tests/${Number(testId)}/attempts/validate`, {
+  if (!normalized) return { allowed: false, used_attempts: 0, max_attempts: 0, reason: 'Telefon raqam kiriting' }
+  return await apiRequest(`/tests/${Number(testId)}/attempts/validate`, {
     method: 'POST',
     auth: false,
     body: { participant_value: normalized }
   })
-  return Number(result?.used_attempts || 0)
 }
 
 export const getAttemptsForParticipantValue = async (testId, value) => {
   const normalized = String(value || '').trim()
-  if (!normalized) return 0
-  const result = await apiRequest(`/tests/${Number(testId)}/attempts/validate`, {
+  if (!normalized) return { allowed: false, used_attempts: 0, max_attempts: 0, reason: 'Qiymat kiriting' }
+  return await apiRequest(`/tests/${Number(testId)}/attempts/validate`, {
     method: 'POST',
     auth: false,
     body: { participant_value: normalized }
   })
-  return Number(result?.used_attempts || 0)
+}
+
+export const getTelegramRegistrationLink = async (testId) => {
+  const normalizedId = Number(testId)
+  if (!Number.isFinite(normalizedId)) return ''
+  const payload = await apiRequest(`/telegram/tests/${normalizedId}/registration-link`)
+  return String(payload?.registrationLink || '')
 }
 
 export const createSubmissionRecord = async (submissionLike) => {
@@ -153,4 +158,3 @@ export const deleteTestRecord = async (testId) => {
     return false
   }
 }
-
