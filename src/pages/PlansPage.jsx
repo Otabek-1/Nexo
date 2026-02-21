@@ -44,7 +44,7 @@ export default function PlansPage() {
 
   const proPriceLabel = isYearly ? '549,000 UZS / yil' : '59,000 UZS / oy'
   const proPlanType = isYearly ? 'pro_yearly' : 'pro_monthly'
-  const selectedPlanLabel = upgradeModal.planType === 'lifetime' ? 'Asoschi Umrbod' : 'Pro'
+  const selectedPlanLabel = upgradeModal.planType === 'lifetime' ? 'Asoschi (Umrbod)' : 'Pro'
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -145,7 +145,7 @@ export default function PlansPage() {
             <div className="absolute -top-3 left-5 rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-800">
               Faqat 30 ta foydalanuvchi uchun
             </div>
-            <h2 className="text-lg font-semibold text-slate-900">Asoschi Umrbod</h2>
+            <h2 className="text-lg font-semibold text-slate-900">Asoschi (Umrbod)</h2>
             <p className="mt-1 text-sm text-slate-600">Asoschilar uchun premium bir martalik kirish</p>
             <p className="mt-5 text-3xl font-semibold text-slate-900">990,000 UZS</p>
             <p className="mt-1 text-sm text-slate-500">Bir martalik to'lov. Oylik/yillik to'lov yo'q.</p>
@@ -175,7 +175,7 @@ export default function PlansPage() {
                   <th className="py-3 pr-4 font-medium">Imkoniyat</th>
                   <th className="py-3 pr-4 font-medium">Bepul</th>
                   <th className="py-3 pr-4 font-medium">Pro</th>
-                  <th className="py-3 font-medium">Asoschi Umrbod</th>
+                  <th className="py-3 font-medium">Asoschi (Umrbod)</th>
                 </tr>
               </thead>
               <tbody className="text-slate-700">
@@ -227,7 +227,7 @@ export default function PlansPage() {
             </details>
             <details className="rounded-xl border border-slate-200 p-4">
               <summary className="cursor-pointer text-sm font-medium text-slate-900">"Umrbod" tarif rostdan ham umrbodmi?</summary>
-              <p className="mt-2 text-sm text-slate-600">Ha. Asoschi Umrbod bir martalik xarid bo'lib, undagi imkoniyatlar uchun qayta to'lov olinmaydi.</p>
+              <p className="mt-2 text-sm text-slate-600">Ha. Asoschi (Umrbod) bir martalik xarid bo'lib, undagi imkoniyatlar uchun qayta to'lov olinmaydi.</p>
             </details>
           </div>
         </section>
