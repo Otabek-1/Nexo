@@ -14,7 +14,7 @@ export const config = {
       ? `${window.location.protocol}//${window.location.host}` 
       : 'http://localhost:5173'
   ),
-  apiBaseUrl: import.meta.env.VITE_API_BASE_URL || 'https://nexo-server-lgzw.onrender.com/api/v1',
+  apiBaseUrl: import.meta.env.VITE_API_BASE_URL || 'https://nexo-server-jwjb.onrender.com/api/v1',
   
   // Feature Flags
   features: {
