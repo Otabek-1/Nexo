@@ -464,8 +464,17 @@ export default function TestSession() {
         const parsed = parseTwoPartAnswer(answer)
         const firstCorrect = q.twoPartCorrectAnswers?.[0] || ''
         const secondCorrect = q.twoPartCorrectAnswers?.[1] || ''
-        const isCorrect = compareCellAnswers(parsed.first, firstCorrect) && compareCellAnswers(parsed.second, secondCorrect)
-        if (isCorrect) autoScore += max
+        const firstPoints = Number(q.twoPartPoints?.[0] || 1)
+        const secondPoints = Number(q.twoPartPoints?.[1] || 1)
+        const firstMatched = compareCellAnswers(parsed.first, firstCorrect)
+        const secondMatched = compareCellAnswers(parsed.second, secondCorrect)
+
+        if (test.testData.scoringType === 'rasch') {
+          if (firstMatched) autoScore += Number.isFinite(firstPoints) && firstPoints > 0 ? firstPoints : 1
+          if (secondMatched) autoScore += Number.isFinite(secondPoints) && secondPoints > 0 ? secondPoints : 1
+        } else if (firstMatched && secondMatched) {
+          autoScore += max
+        }
       }
     })
 

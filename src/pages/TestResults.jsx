@@ -55,6 +55,7 @@ export default function TestResults() {
 
   const ranked = leaderboard?.ranked || []
   const pending = leaderboard?.pending || []
+  const raschStats = leaderboard?.raschStats || null
 
   if (loading) {
     return (
@@ -104,6 +105,61 @@ export default function TestResults() {
             <span>Jami topshirganlar: {ranked.length + pending.length}</span>
           </div>
         </div>
+
+        {test.testData.scoringType === 'rasch' && raschStats && (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-white border border-slate-200 rounded-xl p-5">
+                <p className="text-sm text-slate-500">Rasch statistikasi</p>
+                <p className="mt-2 text-3xl font-bold text-slate-900">{raschStats.totalSubmissions}</p>
+                <p className="text-sm text-slate-600">topshirilgan ish tahlil qilindi</p>
+              </div>
+              <div className="bg-white border border-emerald-200 rounded-xl p-5 bg-emerald-50/50">
+                <p className="text-sm text-emerald-700">Eng ko'p to'g'ri topilgan</p>
+                <p className="mt-2 text-lg font-semibold text-slate-900">{raschStats.easiestQuestion?.label || '-'}</p>
+                <p className="text-sm text-slate-600 mt-1">{raschStats.easiestQuestion ? `${Math.round(raschStats.easiestQuestion.accuracy * 100)}% aniqlik` : 'Maʼlumot yoʻq'}</p>
+                {raschStats.easiestQuestion?.contentPreview && (
+                  <p className="text-sm text-slate-500 mt-2">{raschStats.easiestQuestion.contentPreview}</p>
+                )}
+              </div>
+              <div className="bg-white border border-rose-200 rounded-xl p-5 bg-rose-50/50">
+                <p className="text-sm text-rose-700">Eng kam to'g'ri topilgan</p>
+                <p className="mt-2 text-lg font-semibold text-slate-900">{raschStats.hardestQuestion?.label || '-'}</p>
+                <p className="text-sm text-slate-600 mt-1">{raschStats.hardestQuestion ? `${Math.round(raschStats.hardestQuestion.accuracy * 100)}% aniqlik` : 'Maʼlumot yoʻq'}</p>
+                {raschStats.hardestQuestion?.contentPreview && (
+                  <p className="text-sm text-slate-500 mt-2">{raschStats.hardestQuestion.contentPreview}</p>
+                )}
+              </div>
+            </div>
+
+            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+              <div className="px-6 py-4 border-b border-slate-200 bg-slate-50">
+                <h3 className="text-lg font-semibold text-slate-800">Savollar Kesimidagi Statistika</h3>
+              </div>
+              {raschStats.questionStats?.length > 0 ? (
+                <div className="divide-y divide-slate-200">
+                  {raschStats.questionStats
+                    .slice()
+                    .sort((left, right) => right.accuracy - left.accuracy || right.correctCount - left.correctCount)
+                    .map((question) => (
+                      <div key={question.questionId} className="px-6 py-4 flex items-start justify-between gap-4">
+                        <div className="min-w-0">
+                          <p className="font-semibold text-slate-800">{question.label}</p>
+                          <p className="text-sm text-slate-600 mt-1">{question.contentPreview || 'Preview mavjud emas'}</p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="text-lg font-bold text-slate-900">{Math.round(question.accuracy * 100)}%</p>
+                          <p className="text-xs text-slate-500">{question.correctCount} to'g'ri / {question.totalCount} urinish</p>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              ) : (
+                <div className="px-6 py-8 text-slate-600">Rasch statistikasi hali tayyor emas.</div>
+              )}
+            </div>
+          </>
+        )}
 
         {topThree.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

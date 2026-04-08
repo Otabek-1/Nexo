@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { finalizeSubmission, getSubmissionsByTestId, getTestById, saveManualGrade } from '../lib/testStore'
 import { FREE_LIMITS, PLAN_PRO, getPlanForTest } from '../lib/subscription'
 import RichContent from '../components/RichContent'
+import { compareCellAnswers } from '../lib/cellAnswer'
 
 const getQuestionPoints = (question) => {
   const parsed = Number(question.points)
@@ -29,9 +30,8 @@ export default function ReviewSubmissions() {
 
   const [refreshTick, setRefreshTick] = useState(0)
   const visibleSubmissions = isPro ? submissions : submissions.slice(0, FREE_LIMITS.manualReviewRecent)
-  const manualReviewQuestions = test?.questions
-    ? test.questions.filter(q => q.type === 'essay' || q.type === 'short-answer')
-    : []
+  const reviewQuestions = test?.questions || []
+  const manualReviewQuestions = reviewQuestions.filter(q => q.type === 'essay' || q.type === 'short-answer')
 
   useEffect(() => {
     let mounted = true
@@ -126,6 +126,65 @@ export default function ReviewSubmissions() {
     setRefreshTick(v => v + 1)
   }
 
+  const getAutoCheckMeta = (question, rawAnswer) => {
+    if (!question) return null
+
+    if (question.type === 'multiple-choice' || question.type === 'true-false') {
+      const isCorrect = String(rawAnswer ?? '') === String(question.correctAnswer ?? '')
+      return {
+        isCorrect,
+        userAnswer: formatObjectiveAnswer(question, rawAnswer),
+        correctAnswer: formatObjectiveAnswer(question, question.correctAnswer)
+      }
+    }
+
+    if (question.type === 'two-part-written') {
+      const parsed = parseTwoPartAnswer(rawAnswer)
+      const firstCorrect = String(question.twoPartCorrectAnswers?.[0] || '')
+      const secondCorrect = String(question.twoPartCorrectAnswers?.[1] || '')
+      const firstMatched = compareCellAnswers(parsed.first, firstCorrect)
+      const secondMatched = compareCellAnswers(parsed.second, secondCorrect)
+      return {
+        isCorrect: firstMatched && secondMatched,
+        userAnswer: `a) ${parsed.first || "(Bo'sh)"} | b) ${parsed.second || "(Bo'sh)"}`,
+        correctAnswer: `a) ${firstCorrect || "(Bo'sh)"} | b) ${secondCorrect || "(Bo'sh)"}`,
+        note: `a) ${firstMatched ? "to'g'ri" : "noto'g'ri"}, b) ${secondMatched ? "to'g'ri" : "noto'g'ri"}`
+      }
+    }
+
+    return null
+  }
+
+  const formatObjectiveAnswer = (question, value) => {
+    if (question.type === 'multiple-choice') {
+      const index = Number(value)
+      if (!Number.isInteger(index) || index < 0) return "(Bo'sh)"
+      const option = question.options?.[index]
+      return option ? `${String.fromCharCode(65 + index)}. ${stripHtml(option)}` : `${String.fromCharCode(65 + index)}`
+    }
+    if (question.type === 'true-false') {
+      if (value === 'true') return "To'g'ri"
+      if (value === 'false') return "Noto'g'ri"
+      return "(Bo'sh)"
+    }
+    return String(value || '').trim() || "(Bo'sh)"
+  }
+
+  const stripHtml = (html) => String(html || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
+
+  const parseTwoPartAnswer = (value) => {
+    if (!value) return { first: '', second: '' }
+    try {
+      const parsed = JSON.parse(String(value))
+      return {
+        first: String(parsed?.first || ''),
+        second: String(parsed?.second || '')
+      }
+    } catch {
+      return { first: '', second: '' }
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
@@ -185,26 +244,46 @@ export default function ReviewSubmissions() {
                 <div className="text-sm text-slate-700">Auto: {submission.autoScore} / {submission.autoMaxScore}</div>
               </div>
 
-              {manualReviewQuestions.length > 0 ? (
+              {reviewQuestions.length > 0 ? (
                 <div className="mt-4 space-y-4">
-                  {manualReviewQuestions.map((question, index) => (
+                  {reviewQuestions.map((question, index) => {
+                    const autoCheckMeta = getAutoCheckMeta(question, submission.answers?.[question.id])
+                    const isManual = question.type === 'essay' || question.type === 'short-answer'
+                    return (
                     <div key={question.id} className="border border-slate-200 rounded-lg p-4">
                       <p className="font-medium text-slate-800">{index + 1}.</p>
                       <RichContent html={question.content} className="text-slate-800 mt-1" />
-                      <p className="text-sm text-slate-600 mt-2">Javob: {submission.answers?.[question.id] || '(Bo`sh)'}</p>
-                      <div className="mt-3 max-w-xs">
-                        <label className="block text-sm text-slate-700 mb-1">Ball (max {getQuestionPoints(question)})</label>
-                        <input
-                          type="number"
-                          min="0"
-                          max={getQuestionPoints(question)}
-                          value={submission.manualGrades?.[question.id] ?? ''}
-                          onChange={(e) => saveManualGradeField(submission.id, question.id, e.target.value)}
-                          className="w-full px-3 py-2 border border-slate-300 rounded-lg"
-                        />
-                      </div>
+                      {isManual ? (
+                        <>
+                          <p className="text-sm text-slate-600 mt-2">Javob: {submission.answers?.[question.id] || "(Bo'sh)"}</p>
+                          <div className="mt-3 max-w-xs">
+                            <label className="block text-sm text-slate-700 mb-1">Ball (max {getQuestionPoints(question)})</label>
+                            <input
+                              type="number"
+                              min="0"
+                              max={getQuestionPoints(question)}
+                              value={submission.manualGrades?.[question.id] ?? ''}
+                              onChange={(e) => saveManualGradeField(submission.id, question.id, e.target.value)}
+                              className="w-full px-3 py-2 border border-slate-300 rounded-lg"
+                            />
+                          </div>
+                        </>
+                      ) : (
+                        <div className="mt-3 space-y-2 text-sm">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${autoCheckMeta?.isCorrect ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
+                              {autoCheckMeta?.isCorrect ? "To'g'ri" : "Noto'g'ri"}
+                            </span>
+                            {autoCheckMeta?.note && (
+                              <span className="text-slate-500">{autoCheckMeta.note}</span>
+                            )}
+                          </div>
+                          <p className="text-slate-700"><span className="font-medium">Berilgan javob:</span> {autoCheckMeta?.userAnswer}</p>
+                          <p className="text-slate-700"><span className="font-medium">To'g'ri javob:</span> {autoCheckMeta?.correctAnswer}</p>
+                        </div>
+                      )}
                     </div>
-                  ))}
+                  )})}
                 </div>
               ) : (
                 <p className="text-sm text-slate-600 mt-4">Bu testda yozma savollar yoq.</p>
