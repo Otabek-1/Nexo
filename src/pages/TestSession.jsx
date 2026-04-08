@@ -550,6 +550,15 @@ export default function TestSession() {
     return () => clearTimeout(t)
   }, [durationRemaining, started, submitted, durationEndTs, durationMs, doSubmit, answers])
 
+  useEffect(() => {
+    if (!started || submitted) return
+    if (timing.status !== 'ended') return
+    if (autoSubmitRef.current) return
+    setAutoSubmitting(true)
+    const t = setTimeout(() => doSubmit(answers), 300)
+    return () => clearTimeout(t)
+  }, [timing.status, started, submitted, doSubmit, answers])
+
   // ── Handle Start ──
   const handleStart = async (e) => {
     e.preventDefault()
