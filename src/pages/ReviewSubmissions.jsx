@@ -62,6 +62,16 @@ export default function ReviewSubmissions() {
     }
   }, [id, refreshTick])
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+        <div className="bg-white border border-slate-200 rounded-xl p-8 max-w-lg text-center">
+          <h1 className="text-2xl font-bold text-slate-800 mb-2">Yuklanmoqda...</h1>
+        </div>
+      </div>
+    )
+  }
+
   if (!test) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
@@ -179,16 +189,6 @@ export default function ReviewSubmissions() {
     } catch {
       return { first: '', second: '' }
     }
-  }
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
-        <div className="bg-white border border-slate-200 rounded-xl p-8 max-w-lg text-center">
-          <h1 className="text-2xl font-bold text-slate-800 mb-2">Yuklanmoqda...</h1>
-        </div>
-      </div>
-    )
   }
 
   return (
