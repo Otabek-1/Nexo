@@ -248,6 +248,10 @@ export default function CreateTest() {
       const cleanedOptions = normalized.options.map(opt => opt.trim()).filter(Boolean)
       normalized.options = cleanedOptions
       normalized.correctAnswer = String(Number(normalized.correctAnswer))
+      if (testData.scoringType === 'rasch') normalized.points = '1'
+    }
+    if (normalized.type === 'true-false' && testData.scoringType === 'rasch') {
+      normalized.points = '1'
     }
     if (normalized.type === TWO_PART_WRITTEN_TYPE) {
       const normalizedSubQuestions = Array.isArray(normalized.subQuestions)
@@ -270,6 +274,9 @@ export default function CreateTest() {
         const parsed = Number(item)
         return String(Number.isFinite(parsed) && parsed > 0 ? parsed : 1)
       })
+      if (testData.scoringType === 'rasch') {
+        normalized.twoPartPoints = ['1', '1']
+      }
     }
 
     return normalized
@@ -278,6 +285,11 @@ export default function CreateTest() {
   const addQuestion = () => {
     if (!editingQuestionId && !isPro && questions.length >= FREE_LIMITS.questionsPerTest) {
       alert(`Free plan uchun har testda ${FREE_LIMITS.questionsPerTest} ta savol limiti bor. Pro ni yoqing.`)
+      return
+    }
+
+    if (testData.scoringType === 'rasch' && (currentQuestion.type === 'essay' || currentQuestion.type === 'short-answer')) {
+      alert("Haqiqiy Rasch rejimida faqat multiple-choice, true-false va 2 qismli yozma savollar qo'llanadi")
       return
     }
 
@@ -951,10 +963,10 @@ export default function CreateTest() {
                   onChange={handleQuestionTypeChange}
                   className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
                 >
-                  <option value="short-answer">Qisqa Javob</option>
+                  {testData.scoringType !== 'rasch' && <option value="short-answer">Qisqa Javob</option>}
                   <option value={TWO_PART_WRITTEN_TYPE}>2 qismli yozma (a,b)</option>
                   <option value="multiple-choice">Kop Variantli</option>
-                  <option value="essay">Yozma Javob (Essay)</option>
+                  {testData.scoringType !== 'rasch' && <option value="essay">Yozma Javob (Essay)</option>}
                   <option value="true-false">Togri/Notogri</option>
                 </select>
               </div>
@@ -1013,25 +1025,8 @@ export default function CreateTest() {
                       className="w-full px-4 py-2 border border-emerald-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                     />
                     {testData.scoringType === 'rasch' && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <input
-                          type="number"
-                          min="0.1"
-                          step="0.1"
-                          value={currentQuestion.twoPartPoints?.[0] ?? '1'}
-                          onChange={(e) => handleTwoPartPointChange(0, e.target.value)}
-                          placeholder="a) Ball (Rasch)"
-                          className="w-full px-4 py-2 border border-purple-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                        />
-                        <input
-                          type="number"
-                          min="0.1"
-                          step="0.1"
-                          value={currentQuestion.twoPartPoints?.[1] ?? '1'}
-                          onChange={(e) => handleTwoPartPointChange(1, e.target.value)}
-                          placeholder="b) Ball (Rasch)"
-                          className="w-full px-4 py-2 border border-purple-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                        />
+                      <div className="rounded-lg border border-purple-200 bg-purple-50 px-4 py-3 text-xs text-purple-800">
+                        Haqiqiy Rasch rejimida a) va b) qismlarining har biri alohida 1 ballik dichotomous item sifatida hisoblanadi.
                       </div>
                     )}
                     <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 leading-relaxed">
@@ -1122,7 +1117,7 @@ export default function CreateTest() {
                 </div>
               )}
 
-              {(testData.scoringType === 'rasch' || currentQuestion.type === 'essay') && (
+              {currentQuestion.type === 'essay' && testData.scoringType !== 'rasch' && (
                 <div>
                   <label htmlFor="points" className="block text-sm font-medium text-slate-700 mb-2">
                     Ball *

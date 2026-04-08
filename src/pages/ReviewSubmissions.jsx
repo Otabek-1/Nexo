@@ -112,20 +112,9 @@ export default function ReviewSubmissions() {
 
     let finalScore = submission.autoScore + essayTotal
 
-    if (test.testData.scoringType === 'rasch') {
-      const custom = prompt('Rasch uchun yakuniy ballni kiriting', String(finalScore))
-      if (custom === null) return
-      const parsed = Number(custom)
-      if (!Number.isFinite(parsed) || parsed < 0) {
-        alert('Yakuniy ball notogri')
-        return
-      }
-      finalScore = parsed
-    }
-
     setFinalizingSubmissionId(submission.id)
     try {
-      const updated = await finalizeSubmission(test.id, submission.id, test.testData.scoringType === 'rasch' ? finalScore : null)
+      const updated = await finalizeSubmission(test.id, submission.id, test.testData.scoringType === 'rasch' ? null : finalScore)
       setSubmissions(prev => prev.map(item => (item.id === submission.id ? updated : item)))
       setRefreshTick(v => v + 1)
     } finally {
@@ -219,7 +208,7 @@ export default function ReviewSubmissions() {
           <h2 className="text-2xl font-bold text-slate-800">{test.testData.title}</h2>
           <p className="text-slate-600 mt-2">Baholash turi: {test.testData.scoringType === 'rasch' ? 'Rasch Model' : 'Klassik'}</p>
           {test.testData.scoringType === 'rasch' && (
-            <p className="text-sm text-amber-700 mt-2">Rasch bo'lgani uchun yakuniy ballni admin qo'lda tasdiqlaydi.</p>
+            <p className="text-sm text-amber-700 mt-2">Rasch bo'lgani uchun yakuniy ball cohort bo'yicha avtomatik kalibrlanadi va qo'lda override qilinmaydi.</p>
           )}
           {!isPro && (
             <p className="text-sm text-amber-700 mt-2">
