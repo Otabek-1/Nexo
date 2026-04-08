@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { deleteTestRecord, getTests } from './lib/testStore'
+import { createTestRecord, deleteTestRecord, getTests } from './lib/testStore'
 import { FREE_LIMITS, PLAN_PRO, getCreatorPlan, refreshCreatorPlan } from './lib/subscription'
 import { getPublicTestUrl } from './lib/urls'
 import { getCurrentUser, logoutUser, refreshCurrentUser } from './lib/auth'
 import AppFooter from './components/AppFooter'
 import ButtonSpinner from './components/ButtonSpinner'
+import { createRaschDemoPayload, isDeveloperEmail } from './lib/devTools'
 
 const formatDate = (isoDate) => {
   if (!isoDate) return '-'
@@ -23,7 +24,9 @@ export default function Dashboard() {
   const [currentUser, setCurrentUser] = useState(getCurrentUser())
   const [logoutLoading, setLogoutLoading] = useState(false)
   const [deletingTestId, setDeletingTestId] = useState(null)
+  const [devCreatingDemo, setDevCreatingDemo] = useState(false)
   const isPro = plan === PLAN_PRO
+  const isDeveloper = isDeveloperEmail(currentUser?.email)
 
   useEffect(() => {
     sessionStorage.setItem('nexo_creator_mode', '1')
@@ -94,6 +97,24 @@ export default function Dashboard() {
     }
   }
 
+  const handleCreateDemoRasch = async () => {
+    if (devCreatingDemo) return
+    setDevCreatingDemo(true)
+    try {
+      const payload = createRaschDemoPayload()
+      const created = await createTestRecord(payload)
+      if (!created?.id) {
+        alert('Demo test yaratilmadi')
+        return
+      }
+      navigate(`/edit-test/${created.id}`)
+    } catch (error) {
+      alert(error?.payload?.detail || error?.message || 'Demo Rasch test yaratishda xatolik')
+    } finally {
+      setDevCreatingDemo(false)
+    }
+  }
+
   return (
     <div className="w-full min-h-screen bg-slate-50">
       <header className="bg-white shadow-sm border-b border-slate-200">
@@ -154,6 +175,30 @@ export default function Dashboard() {
             Planlar
           </button>
         </div>
+
+        {isDeveloper && (
+          <div className="mb-8 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-800">Developer Tools</h3>
+                <p className="mt-1 text-sm text-slate-600">
+                  Faqat developer email uchun. Demo Rasch test yaratilib bo‘lgach tahrirlash sahifasiga o‘tasiz.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleCreateDemoRasch}
+                disabled={devCreatingDemo}
+                className="px-4 py-2.5 rounded-lg bg-slate-900 text-white font-medium hover:bg-slate-800 transition disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                <span className="inline-flex items-center gap-2">
+                  {devCreatingDemo && <ButtonSpinner className="h-3.5 w-3.5" />}
+                  {devCreatingDemo ? 'Yaratilmoqda...' : 'Create Demo Rasch'}
+                </span>
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="bg-white rounded-lg shadow-sm border border-slate-200 overflow-hidden">
           <div className="px-8 py-6 border-b border-slate-200">
