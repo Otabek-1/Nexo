@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { PLAN_FREE, setCreatorPlan } from '../lib/subscription'
+import ButtonSpinner from '../components/ButtonSpinner'
 
 const CheckIcon = ({ muted = false }) => (
   <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full ${muted ? 'bg-slate-200 text-slate-500' : 'bg-emerald-100 text-emerald-700'}`}>
@@ -30,6 +31,7 @@ export default function PlansPage() {
   const navigate = useNavigate()
   const [billingCycle, setBillingCycle] = useState('monthly')
   const [upgradeModal, setUpgradeModal] = useState({ open: false, planType: '' })
+  const [freePlanLoading, setFreePlanLoading] = useState(false)
 
   const isYearly = billingCycle === 'yearly'
 
@@ -38,8 +40,14 @@ export default function PlansPage() {
   }
 
   const handleGetStarted = async () => {
-    await setCreatorPlan(PLAN_FREE)
-    navigate('/dashboard')
+    if (freePlanLoading) return
+    setFreePlanLoading(true)
+    try {
+      await setCreatorPlan(PLAN_FREE)
+      navigate('/dashboard')
+    } finally {
+      setFreePlanLoading(false)
+    }
   }
 
   const proPriceLabel = isYearly ? '549,000 UZS / yil' : '59,000 UZS / oy'
@@ -104,9 +112,13 @@ export default function PlansPage() {
             <button
               type="button"
               onClick={handleGetStarted}
-              className="mt-8 w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-800 transition hover:bg-slate-100"
+              disabled={freePlanLoading}
+              className="mt-8 w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-800 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-70"
             >
-              Boshlash
+              <span className="inline-flex items-center gap-2">
+                {freePlanLoading && <ButtonSpinner className="h-3.5 w-3.5" />}
+                {freePlanLoading ? 'Yuklanmoqda...' : 'Boshlash'}
+              </span>
             </button>
           </article>
 

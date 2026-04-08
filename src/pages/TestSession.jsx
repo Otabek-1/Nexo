@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom'
 import { createSubmissionRecord, getAttemptsForParticipantValue, getTestById } from '../lib/testStore'
 import RichContent from '../components/RichContent'
 import AppFooter from '../components/AppFooter'
+import ButtonSpinner from '../components/ButtonSpinner'
 import {
   answerTextToCells,
   cellsToAnswerText,
@@ -224,7 +225,7 @@ function QuestionNav({ questions, answers, currentIdx, onGoto }) {
 
 // ─── Confirm modal ───────────────────────────────────────────────────────────
 
-function ConfirmModal({ unanswered, onConfirm, onCancel }) {
+function ConfirmModal({ unanswered, onConfirm, onCancel, submitting = false }) {
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-md w-full p-6">
@@ -243,13 +244,18 @@ function ConfirmModal({ unanswered, onConfirm, onCancel }) {
         <div className="flex gap-3">
           <button
             onClick={onConfirm}
-            className="flex-1 px-4 py-2 bg-emerald-600 text-white font-semibold rounded-xl hover:bg-emerald-700 transition"
+            disabled={submitting}
+            className="flex-1 px-4 py-2 bg-emerald-600 text-white font-semibold rounded-xl hover:bg-emerald-700 transition disabled:cursor-not-allowed disabled:opacity-70"
           >
-            Ha, yakunlash
+            <span className="inline-flex items-center gap-2">
+              {submitting && <ButtonSpinner />}
+              {submitting ? 'Yuborilmoqda...' : 'Ha, yakunlash'}
+            </span>
           </button>
           <button
             onClick={onCancel}
-            className="flex-1 px-4 py-2 bg-slate-100 text-slate-700 font-semibold rounded-xl hover:bg-slate-200 transition"
+            disabled={submitting}
+            className="flex-1 px-4 py-2 bg-slate-100 text-slate-700 font-semibold rounded-xl hover:bg-slate-200 transition disabled:cursor-not-allowed disabled:opacity-70"
           >
             Orqaga qaytish
           </button>
@@ -347,6 +353,8 @@ export default function TestSession() {
   const [currentIdx, setCurrentIdx] = useState(0)
   const [showConfirm, setShowConfirm] = useState(false)
   const [autoSubmitting, setAutoSubmitting] = useState(false)
+  const [startSubmitting, setStartSubmitting] = useState(false)
+  const [submitLoading, setSubmitLoading] = useState(false)
   const [durationEndTs, setDurationEndTs] = useState(null) // test boshlanganda qo'yiladi
 
   // ── Shuffled questions (session davomida barqaror) ──
@@ -442,6 +450,7 @@ export default function TestSession() {
   const doSubmit = useCallback(async (currentAnswers) => {
     if (autoSubmitRef.current) return
     autoSubmitRef.current = true
+    setSubmitLoading(true)
 
     const answersByQuestion = {}
     test.questions.forEach(q => {
@@ -506,6 +515,7 @@ export default function TestSession() {
       saved = await createSubmissionRecord(submission)
     } catch (error) {
       autoSubmitRef.current = false
+      setSubmitLoading(false)
       const reason = error?.payload?.detail || error?.message || "Testni topshirishda xatolik yuz berdi"
       alert(String(reason))
       setAutoSubmitting(false)
@@ -515,6 +525,7 @@ export default function TestSession() {
     try { sessionStorage.removeItem(sessionKey) } catch { }
     setSubmitted(saved || submission)
     setShowConfirm(false)
+    setSubmitLoading(false)
     setAutoSubmitting(false)
   }, [test, answers, participantValues, requiresManualReview, sessionKey, attemptsEnabled])
 
@@ -531,12 +542,15 @@ export default function TestSession() {
   // ── Handle Start ──
   const handleStart = async (e) => {
     e.preventDefault()
+    if (startSubmitting) return
+    setStartSubmitting(true)
 
     const normalizedParticipant = {}
     for (const field of participantFields) {
       const value = String(participantValues[field.id] || '').trim()
       if (field.required && !value) {
         alert(`"${field.label}" maydonini to'liq kiriting`)
+        setStartSubmitting(false)
         return
       }
       normalizedParticipant[field.id] = value
@@ -547,6 +561,7 @@ export default function TestSession() {
       : (normalizedParticipant.fullName || '')
     if (!attemptValue) {
       alert(attemptsEnabled ? 'Telefon raqam maydoni majburiy' : 'Full Name maydoni majburiy')
+      setStartSubmitting(false)
       return
     }
 
@@ -554,6 +569,7 @@ export default function TestSession() {
       const phoneRegex = /^\+[1-9]\d{7,14}$/
       if (!phoneRegex.test(attemptValue)) {
         alert("Telefon raqam to'liq davlat kodi bilan kiriting. Masalan: +998901234567")
+        setStartSubmitting(false)
         return
       }
 
@@ -563,10 +579,12 @@ export default function TestSession() {
       } catch (error) {
         const reason = error?.payload?.detail || error?.message || 'Urinishni tekshirishda xatolik'
         alert(String(reason))
+        setStartSubmitting(false)
         return
       }
       if (!validation?.allowed) {
         alert(validation?.reason || 'Urinish limiti tugagan')
+        setStartSubmitting(false)
         return
       }
     }
@@ -582,6 +600,7 @@ export default function TestSession() {
     setParticipantValues(normalizedParticipant)
     setCurrentIdx(0)
     setStarted(true)
+    setStartSubmitting(false)
   }
 
   const handleAnswerChange = (questionId, value) => {
@@ -596,7 +615,10 @@ export default function TestSession() {
     handleAnswerChange(questionId, next)
   }
 
-  const handleSubmitClick = () => setShowConfirm(true)
+  const handleSubmitClick = () => {
+    if (submitLoading) return
+    setShowConfirm(true)
+  }
 
   const unansweredCount = useMemo(() => {
     if (!shuffledQuestions.length) return 0
@@ -782,8 +804,12 @@ export default function TestSession() {
               </div>
             )}
             <button type="submit"
-              className="w-full px-5 py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 active:scale-95 transition-all">
-              🚀 Testni Boshlash
+              disabled={startSubmitting}
+              className="w-full px-5 py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 active:scale-95 transition-all disabled:cursor-not-allowed disabled:opacity-70">
+              <span className="inline-flex items-center gap-2">
+                {startSubmitting && <ButtonSpinner />}
+                {startSubmitting ? 'Tekshirilmoqda...' : '🚀 Testni Boshlash'}
+              </span>
             </button>
           </form>
         )}
@@ -961,9 +987,13 @@ export default function TestSession() {
                       <button
                         type="button"
                         onClick={handleSubmitClick}
-                        className="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 transition"
+                        disabled={submitLoading}
+                        className="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 transition disabled:cursor-not-allowed disabled:opacity-70"
                       >
-                        Yakunlash ✓
+                        <span className="inline-flex items-center gap-2">
+                          {submitLoading && <ButtonSpinner className="h-3.5 w-3.5" />}
+                          {submitLoading ? 'Yuborilmoqda...' : 'Yakunlash ✓'}
+                        </span>
                       </button>
                     )}
                   </div>
@@ -981,9 +1011,13 @@ export default function TestSession() {
               <button
                 type="button"
                 onClick={handleSubmitClick}
-                className="px-5 py-2.5 bg-emerald-600 text-white font-semibold rounded-xl hover:bg-emerald-700 active:scale-95 transition-all text-sm"
+                disabled={submitLoading}
+                className="px-5 py-2.5 bg-emerald-600 text-white font-semibold rounded-xl hover:bg-emerald-700 active:scale-95 transition-all text-sm disabled:cursor-not-allowed disabled:opacity-70"
               >
-                Testni Yakunlash
+                <span className="inline-flex items-center gap-2">
+                  {submitLoading && <ButtonSpinner />}
+                  {submitLoading ? 'Yuborilmoqda...' : 'Testni Yakunlash'}
+                </span>
               </button>
             </div>
           </div>
@@ -1033,6 +1067,7 @@ export default function TestSession() {
           unanswered={unansweredCount}
           onConfirm={() => doSubmit(answers)}
           onCancel={() => setShowConfirm(false)}
+          submitting={submitLoading}
         />
       )}
     </div>

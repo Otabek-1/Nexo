@@ -5,6 +5,7 @@ import { FREE_LIMITS, PLAN_PRO, getCreatorPlan, refreshCreatorPlan } from './lib
 import { getPublicTestUrl } from './lib/urls'
 import { getCurrentUser, logoutUser, refreshCurrentUser } from './lib/auth'
 import AppFooter from './components/AppFooter'
+import ButtonSpinner from './components/ButtonSpinner'
 
 const formatDate = (isoDate) => {
   if (!isoDate) return '-'
@@ -20,6 +21,8 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true)
   const [refreshTick, setRefreshTick] = useState(0)
   const [currentUser, setCurrentUser] = useState(getCurrentUser())
+  const [logoutLoading, setLogoutLoading] = useState(false)
+  const [deletingTestId, setDeletingTestId] = useState(null)
   const isPro = plan === PLAN_PRO
 
   useEffect(() => {
@@ -53,11 +56,16 @@ export default function Dashboard() {
   }, [refreshTick])
 
   const handleLogout = async () => {
+    if (logoutLoading) return
     const confirmed = window.confirm('Rostdan ham chiqishni xohlaysizmi?')
     if (!confirmed) return
-    
-    await logoutUser()
-    navigate('/')
+    setLogoutLoading(true)
+    try {
+      await logoutUser()
+      navigate('/')
+    } finally {
+      setLogoutLoading(false)
+    }
   }
 
   const testsWithStats = useMemo(() => {
@@ -69,16 +77,21 @@ export default function Dashboard() {
   }, [tests])
 
   const handleDeleteTest = async (testId) => {
+    if (deletingTestId) return
     const confirmed = window.confirm('Rostdan ham bu imtihonni ochirmoqchimisiz? Barcha submissionlar ham ochiriladi.')
     if (!confirmed) return
 
-    const deleted = await deleteTestRecord(testId)
-    if (!deleted) {
-      alert('Imtihonni ochirishda xatolik boldi')
-      return
+    setDeletingTestId(testId)
+    try {
+      const deleted = await deleteTestRecord(testId)
+      if (!deleted) {
+        alert('Imtihonni ochirishda xatolik boldi')
+        return
+      }
+      setRefreshTick(v => v + 1)
+    } finally {
+      setDeletingTestId(null)
     }
-
-    setRefreshTick(v => v + 1)
   }
 
   return (
@@ -98,9 +111,13 @@ export default function Dashboard() {
             )}
             <button
               onClick={handleLogout}
-              className="px-4 py-2 text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50 transition"
+              disabled={logoutLoading}
+              className="px-4 py-2 text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50 transition disabled:cursor-not-allowed disabled:opacity-70"
             >
-              Chiqish
+              <span className="inline-flex items-center gap-2">
+                {logoutLoading && <ButtonSpinner className="h-3.5 w-3.5" />}
+                {logoutLoading ? 'Chiqilmoqda...' : 'Chiqish'}
+              </span>
             </button>
           </div>
         </div>
@@ -203,9 +220,13 @@ export default function Dashboard() {
                       <button
                         type="button"
                         onClick={() => handleDeleteTest(test.id)}
-                        className="px-3 py-1 text-red-700 hover:bg-red-50 rounded transition text-sm font-medium"
+                        disabled={deletingTestId === test.id}
+                        className="px-3 py-1 text-red-700 hover:bg-red-50 rounded transition text-sm font-medium disabled:cursor-not-allowed disabled:opacity-70"
                       >
-                        Delete
+                        <span className="inline-flex items-center gap-2">
+                          {deletingTestId === test.id && <ButtonSpinner className="h-3.5 w-3.5" />}
+                          {deletingTestId === test.id ? 'Ochirilmoqda...' : 'Delete'}
+                        </span>
                       </button>
                     </div>
                   </div>

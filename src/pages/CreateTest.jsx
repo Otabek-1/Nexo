@@ -5,6 +5,7 @@ import { FREE_LIMITS, PLAN_PRO, getCreatorPlan } from '../lib/subscription'
 import { getPublicTestUrl } from '../lib/urls'
 import RichContent from '../components/RichContent'
 import RichTextEditor from '../components/RichTextEditor'
+import ButtonSpinner from '../components/ButtonSpinner'
 import { isRichContentEmpty } from '../lib/richContent'
 import { normalizeCellAnswerText, tokenizeIntoCells } from '../lib/cellAnswer'
 
@@ -90,6 +91,7 @@ export default function CreateTest() {
   const [editingQuestionId, setEditingQuestionId] = useState(null)
   const [createdTest, setCreatedTest] = useState(null)
   const [telegramRegistrationLink, setTelegramRegistrationLink] = useState('')
+  const [saveLoading, setSaveLoading] = useState(false)
 
   const shareLink = useMemo(() => {
     if (!createdTest) return ''
@@ -512,6 +514,7 @@ export default function CreateTest() {
   }
 
   const finishCreating = async () => {
+    if (saveLoading) return
     if (!isEditing && !isPro && existingTests.length >= FREE_LIMITS.activeTests) {
       alert(`Free planda ${FREE_LIMITS.activeTests} ta test limiti bor. Pro ni yoqing.`)
       return
@@ -541,6 +544,7 @@ export default function CreateTest() {
       questions
     }
 
+    setSaveLoading(true)
     try {
       const saved = isEditing
         ? await updateTestRecord(editingTest.id, prev => ({
@@ -569,6 +573,8 @@ export default function CreateTest() {
     } catch (error) {
       console.error('[CreateTest] save failed:', error)
       alert(formatApiError(error))
+    } finally {
+      setSaveLoading(false)
     }
   }
 
@@ -1241,9 +1247,13 @@ export default function CreateTest() {
               <button
                 type="button"
                 onClick={finishCreating}
-                className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition"
+                disabled={saveLoading}
+                className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition disabled:cursor-not-allowed disabled:opacity-70"
               >
-                {isEditing ? 'Imtihonni Yangilash' : 'Imtihonni Yaratish'}
+                <span className="inline-flex items-center gap-2">
+                  {saveLoading && <ButtonSpinner className="h-3.5 w-3.5" />}
+                  {saveLoading ? 'Saqlanmoqda...' : isEditing ? 'Imtihonni Yangilash' : 'Imtihonni Yaratish'}
+                </span>
               </button>
               <button
                 type="button"

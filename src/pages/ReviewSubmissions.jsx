@@ -4,6 +4,7 @@ import { finalizeSubmission, getSubmissionsByTestId, getTestById, saveManualGrad
 import { FREE_LIMITS, PLAN_PRO, getPlanForTest } from '../lib/subscription'
 import RichContent from '../components/RichContent'
 import { compareCellAnswers } from '../lib/cellAnswer'
+import ButtonSpinner from '../components/ButtonSpinner'
 
 const getQuestionPoints = (question) => {
   const parsed = Number(question.points)
@@ -29,6 +30,7 @@ export default function ReviewSubmissions() {
   const isPro = creatorPlan === PLAN_PRO
 
   const [refreshTick, setRefreshTick] = useState(0)
+  const [finalizingSubmissionId, setFinalizingSubmissionId] = useState(null)
   const visibleSubmissions = isPro ? submissions : submissions.slice(0, FREE_LIMITS.manualReviewRecent)
   const reviewQuestions = test?.questions || []
   const manualReviewQuestions = reviewQuestions.filter(q => q.type === 'essay' || q.type === 'short-answer')
@@ -93,6 +95,7 @@ export default function ReviewSubmissions() {
   }
 
   const finalizeCurrentSubmission = async (submission) => {
+    if (finalizingSubmissionId) return
     if (!isPro) {
       alert('Finalize qilish Pro plan uchun ochiq. /plans bo`limida Pro ni yoqing.')
       return
@@ -120,10 +123,14 @@ export default function ReviewSubmissions() {
       finalScore = parsed
     }
 
-    const updated = await finalizeSubmission(test.id, submission.id, test.testData.scoringType === 'rasch' ? finalScore : null)
-    setSubmissions(prev => prev.map(item => (item.id === submission.id ? updated : item)))
-
-    setRefreshTick(v => v + 1)
+    setFinalizingSubmissionId(submission.id)
+    try {
+      const updated = await finalizeSubmission(test.id, submission.id, test.testData.scoringType === 'rasch' ? finalScore : null)
+      setSubmissions(prev => prev.map(item => (item.id === submission.id ? updated : item)))
+      setRefreshTick(v => v + 1)
+    } finally {
+      setFinalizingSubmissionId(null)
+    }
   }
 
   const getAutoCheckMeta = (question, rawAnswer) => {
@@ -294,9 +301,15 @@ export default function ReviewSubmissions() {
                 <button
                   type="button"
                   onClick={() => finalizeCurrentSubmission(submission)}
-                  className={`px-4 py-2 rounded-lg ${isPro ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-slate-200 text-slate-500 cursor-not-allowed'}`}
+                  disabled={!isPro || finalizingSubmissionId === submission.id}
+                  className={`px-4 py-2 rounded-lg ${isPro ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-slate-200 text-slate-500 cursor-not-allowed'} disabled:cursor-not-allowed disabled:opacity-70`}
                 >
-                  {isPro ? 'Saqlash va Yakunlash' : 'Pro talab qilinadi'}
+                  {isPro ? (
+                    <span className="inline-flex items-center gap-2">
+                      {finalizingSubmissionId === submission.id && <ButtonSpinner className="h-3.5 w-3.5" />}
+                      {finalizingSubmissionId === submission.id ? 'Saqlanmoqda...' : 'Saqlash va Yakunlash'}
+                    </span>
+                  ) : 'Pro talab qilinadi'}
                 </button>
               </div>
             </div>
