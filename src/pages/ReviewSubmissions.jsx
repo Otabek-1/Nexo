@@ -158,6 +158,18 @@ export default function ReviewSubmissions() {
       }
     }
 
+    if (question.type === 'two-part-math') {
+      const parsed = parseTwoPartAnswer(rawAnswer)
+      const firstCorrect = String(question.twoPartCorrectAnswers?.[0] || '')
+      const secondCorrect = String(question.twoPartCorrectAnswers?.[1] || '')
+      return {
+        isCorrect: null,
+        userAnswer: `a) ${parsed.first || "(Bo'sh)"} | b) ${parsed.second || "(Bo'sh)"}`,
+        correctAnswer: `a) ${firstCorrect || "(Bo'sh)"} | b) ${secondCorrect || "(Bo'sh)"}`,
+        note: "Matematik javob backendda ekvivalentlik bo'yicha auto-check qilinadi"
+      }
+    }
+
     return null
   }
 
@@ -267,8 +279,14 @@ export default function ReviewSubmissions() {
                       ) : (
                         <div className="mt-3 space-y-2 text-sm">
                           <div className="flex flex-wrap items-center gap-2">
-                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${autoCheckMeta?.isCorrect ? 'bg-emerald-100 text-emerald-800' : 'bg-rose-100 text-rose-800'}`}>
-                              {autoCheckMeta?.isCorrect ? "To'g'ri" : "Noto'g'ri"}
+                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                              autoCheckMeta?.isCorrect === null
+                                ? 'bg-sky-100 text-sky-800'
+                                : autoCheckMeta?.isCorrect
+                                  ? 'bg-emerald-100 text-emerald-800'
+                                  : 'bg-rose-100 text-rose-800'
+                            }`}>
+                              {autoCheckMeta?.isCorrect === null ? 'Math auto-check' : autoCheckMeta?.isCorrect ? "To'g'ri" : "Noto'g'ri"}
                             </span>
                             {autoCheckMeta?.note && (
                               <span className="text-slate-500">{autoCheckMeta.note}</span>

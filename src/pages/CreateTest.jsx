@@ -43,6 +43,8 @@ const formatApiError = (error) => {
 
 export default function CreateTest() {
   const TWO_PART_WRITTEN_TYPE = 'two-part-written'
+  const TWO_PART_MATH_TYPE = 'two-part-math'
+  const isTwoPartType = (value) => value === TWO_PART_WRITTEN_TYPE || value === TWO_PART_MATH_TYPE
   const navigate = useNavigate()
   const { id } = useParams()
   const [creatorPlan, setCreatorPlan] = useState(getCreatorPlan())
@@ -220,15 +222,15 @@ export default function CreateTest() {
       type: value,
       options: value === 'multiple-choice' ? prev.options : [],
       correctAnswer: '',
-      subQuestions: value === TWO_PART_WRITTEN_TYPE
+      subQuestions: isTwoPartType(value)
         ? (Array.isArray(prev.subQuestions) && prev.subQuestions.length === 2 ? prev.subQuestions : ['', ''])
         : ['', ''],
-      twoPartCorrectAnswers: value === TWO_PART_WRITTEN_TYPE
+      twoPartCorrectAnswers: isTwoPartType(value)
         ? (Array.isArray(prev.twoPartCorrectAnswers) && prev.twoPartCorrectAnswers.length === 2
           ? prev.twoPartCorrectAnswers
           : ['', ''])
         : ['', ''],
-      twoPartPoints: value === TWO_PART_WRITTEN_TYPE
+      twoPartPoints: isTwoPartType(value)
         ? (Array.isArray(prev.twoPartPoints) && prev.twoPartPoints.length === 2
           ? prev.twoPartPoints
           : ['1', '1'])
@@ -253,7 +255,7 @@ export default function CreateTest() {
     if (normalized.type === 'true-false' && testData.scoringType === 'rasch') {
       normalized.points = '1'
     }
-    if (normalized.type === TWO_PART_WRITTEN_TYPE) {
+    if (isTwoPartType(normalized.type)) {
       const normalizedSubQuestions = Array.isArray(normalized.subQuestions)
         ? normalized.subQuestions.map(item => String(item || '').trim()).slice(0, 2)
         : []
@@ -261,10 +263,12 @@ export default function CreateTest() {
       normalized.subQuestions = normalizedSubQuestions
 
       const normalizedCorrectAnswers = Array.isArray(normalized.twoPartCorrectAnswers)
-        ? normalized.twoPartCorrectAnswers.map(item => normalizeCellAnswerText(item).trim()).slice(0, 2)
+        ? normalized.twoPartCorrectAnswers.map(item => String(item || '').trim()).slice(0, 2)
         : []
       while (normalizedCorrectAnswers.length < 2) normalizedCorrectAnswers.push('')
-      normalized.twoPartCorrectAnswers = normalizedCorrectAnswers
+      normalized.twoPartCorrectAnswers = normalized.type === TWO_PART_WRITTEN_TYPE
+        ? normalizedCorrectAnswers.map(item => normalizeCellAnswerText(item).trim())
+        : normalizedCorrectAnswers
 
       const normalizedPoints = Array.isArray(normalized.twoPartPoints)
         ? normalized.twoPartPoints.map((item) => String(item ?? '').trim()).slice(0, 2)
@@ -289,7 +293,7 @@ export default function CreateTest() {
     }
 
     if (testData.scoringType === 'rasch' && (currentQuestion.type === 'essay' || currentQuestion.type === 'short-answer')) {
-      alert("Haqiqiy Rasch rejimida faqat multiple-choice, true-false va 2 qismli yozma savollar qo'llanadi")
+      alert("Haqiqiy Rasch rejimida faqat multiple-choice, true-false, 2 qismli yozma va 2 qismli matematik savollar qo'llanadi")
       return
     }
 
@@ -324,7 +328,7 @@ export default function CreateTest() {
         return
       }
     }
-    if (currentQuestion.type === TWO_PART_WRITTEN_TYPE) {
+    if (isTwoPartType(currentQuestion.type)) {
       const parts = Array.isArray(currentQuestion.subQuestions) ? currentQuestion.subQuestions : []
       const first = String(parts[0] || '').trim()
       const second = String(parts[1] || '').trim()
@@ -334,10 +338,15 @@ export default function CreateTest() {
       }
 
       const corrects = Array.isArray(currentQuestion.twoPartCorrectAnswers) ? currentQuestion.twoPartCorrectAnswers : []
-      const firstCorrect = String(corrects[0] || '')
-      const secondCorrect = String(corrects[1] || '')
-      if (tokenizeIntoCells(firstCorrect).length === 0 || tokenizeIntoCells(secondCorrect).length === 0) {
-        alert("Bu turda creator uchun a) va b) to'g'ri javoblarini kiriting")
+      const firstCorrect = String(corrects[0] || '').trim()
+      const secondCorrect = String(corrects[1] || '').trim()
+      if (currentQuestion.type === TWO_PART_WRITTEN_TYPE) {
+        if (tokenizeIntoCells(firstCorrect).length === 0 || tokenizeIntoCells(secondCorrect).length === 0) {
+          alert("Bu turda creator uchun a) va b) to'g'ri javoblarini kiriting")
+          return
+        }
+      } else if (!firstCorrect || !secondCorrect) {
+        alert("Bu turda creator uchun a) va b) matematik to'g'ri javoblarini kiriting")
         return
       }
 
@@ -965,6 +974,7 @@ export default function CreateTest() {
                 >
                   {testData.scoringType !== 'rasch' && <option value="short-answer">Qisqa Javob</option>}
                   <option value={TWO_PART_WRITTEN_TYPE}>2 qismli yozma (a,b)</option>
+                  <option value={TWO_PART_MATH_TYPE}>2 qismli matematik (a,b)</option>
                   <option value="multiple-choice">Kop Variantli</option>
                   {testData.scoringType !== 'rasch' && <option value="essay">Yozma Javob (Essay)</option>}
                   <option value="true-false">Togri/Notogri</option>
@@ -987,7 +997,7 @@ export default function CreateTest() {
                 </div>
               </div>
 
-              {currentQuestion.type === TWO_PART_WRITTEN_TYPE && (
+              {isTwoPartType(currentQuestion.type) && (
                 <div className="rounded-lg border border-slate-200 p-4 space-y-3">
                   <p className="text-sm font-medium text-slate-700">Kichik savollar (2 ta)</p>
                   <input
@@ -1014,14 +1024,14 @@ export default function CreateTest() {
                       type="text"
                       value={currentQuestion.twoPartCorrectAnswers?.[0] ?? ''}
                       onChange={(e) => handleTwoPartCorrectAnswerChange(0, e.target.value)}
-                      placeholder="a) To'g'ri javob"
+                      placeholder={currentQuestion.type === TWO_PART_MATH_TYPE ? "a) To'g'ri matematik javob" : "a) To'g'ri javob"}
                       className="w-full px-4 py-2 border border-emerald-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                     />
                     <input
                       type="text"
                       value={currentQuestion.twoPartCorrectAnswers?.[1] ?? ''}
                       onChange={(e) => handleTwoPartCorrectAnswerChange(1, e.target.value)}
-                      placeholder="b) To'g'ri javob"
+                      placeholder={currentQuestion.type === TWO_PART_MATH_TYPE ? "b) To'g'ri matematik javob" : "b) To'g'ri javob"}
                       className="w-full px-4 py-2 border border-emerald-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                     />
                     {testData.scoringType === 'rasch' && (
@@ -1029,10 +1039,17 @@ export default function CreateTest() {
                         Haqiqiy Rasch rejimida a) va b) qismlarining har biri alohida 1 ballik dichotomous item sifatida hisoblanadi.
                       </div>
                     )}
-                    <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 leading-relaxed">
-                      Eslatma: Sh, Ch, Ng bitta katak emas (S+H, C+H, N+G alohida kataklarda yoziladi). O', G' esa bitta katakka yoziladi.
-                      Sonlar alohida katakka yoziladi. Javob bir nechta so'z bo'lsa, so'zlar orasida bitta bo'sh katak qoldiriladi.
-                    </div>
+                    {currentQuestion.type === TWO_PART_WRITTEN_TYPE ? (
+                      <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 leading-relaxed">
+                        Eslatma: Sh, Ch, Ng bitta katak emas (S+H, C+H, N+G alohida kataklarda yoziladi). O', G' esa bitta katakka yoziladi.
+                        Sonlar alohida katakka yoziladi. Javob bir nechta so'z bo'lsa, so'zlar orasida bitta bo'sh katak qoldiriladi.
+                      </div>
+                    ) : (
+                      <div className="rounded-lg border border-sky-300 bg-sky-50 p-3 text-xs text-sky-900 leading-relaxed">
+                        Matematik ifodalarni oddiy ko'rinishda yozishingiz mumkin: sqrt(x), x^2, 1/2, pi, sin(x).
+                        Backend sqrt(2) va 2^(1/2) kabi ekvivalent javoblarni bir xil deb tekshiradi.
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -1175,6 +1192,7 @@ export default function CreateTest() {
                             <span className="bg-slate-100 px-2 py-1 rounded">
                               {q.type === 'short-answer' ? 'Qisqa Javob' :
                                 q.type === TWO_PART_WRITTEN_TYPE ? '2 qismli yozma' :
+                                q.type === TWO_PART_MATH_TYPE ? '2 qismli matematik' :
                                 q.type === 'multiple-choice' ? 'Kop Variantli' :
                                   q.type === 'essay' ? 'Yozma Javob' :
                                     'Togri/Notogri'}
@@ -1192,12 +1210,12 @@ export default function CreateTest() {
                                 Togri javob: {q.correctAnswer === 'true' ? 'Togri' : 'Notogri'}
                               </span>
                             )}
-                            {q.type === TWO_PART_WRITTEN_TYPE && (
+                            {isTwoPartType(q.type) && (
                               <span>
                                 Kichik savollar: {(q.subQuestions || []).filter(Boolean).length}/2, To'g'ri javoblar: {((q.twoPartCorrectAnswers || []).filter(Boolean).length)}/2
                               </span>
                             )}
-                            {q.type === TWO_PART_WRITTEN_TYPE && testData.scoringType === 'rasch' && (
+                            {isTwoPartType(q.type) && testData.scoringType === 'rasch' && (
                               <span>
                                 Rasch ball: a) {q.twoPartPoints?.[0] || 1}, b) {q.twoPartPoints?.[1] || 1}
                               </span>

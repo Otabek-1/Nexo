@@ -14,6 +14,8 @@ import {
 } from '../lib/cellAnswer'
 
 const TWO_PART_WRITTEN_TYPE = 'two-part-written'
+const TWO_PART_MATH_TYPE = 'two-part-math'
+const isTwoPartType = (value) => value === TWO_PART_WRITTEN_TYPE || value === TWO_PART_MATH_TYPE
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -25,7 +27,7 @@ const getQuestionMaxScore = (question, scoringType) => {
   if (
     question.type === 'multiple-choice' ||
     question.type === 'true-false' ||
-    question.type === TWO_PART_WRITTEN_TYPE
+    isTwoPartType(question.type)
   ) return 1
   return 0
 }
@@ -73,6 +75,10 @@ const isQuestionAnswered = (question, rawAnswer) => {
   if (question?.type === TWO_PART_WRITTEN_TYPE) {
     const parsed = parseTwoPartAnswer(rawAnswer)
     return tokenizeIntoCells(parsed.first).length > 0 && tokenizeIntoCells(parsed.second).length > 0
+  }
+  if (question?.type === TWO_PART_MATH_TYPE) {
+    const parsed = parseTwoPartAnswer(rawAnswer)
+    return Boolean(String(parsed.first || '').trim() && String(parsed.second || '').trim())
   }
   return rawAnswer !== undefined && rawAnswer !== ''
 }
@@ -443,8 +449,9 @@ export default function TestSession() {
   useEffect(() => {
     if (!test) return
     if (timing.status !== 'ended') return
+    if (started && !submitted) return
     navigate(`/test/${test.id}/results`, { replace: true })
-  }, [timing.status, test, navigate])
+  }, [timing.status, test, navigate, started, submitted])
 
   // ── Auto-submit when duration runs out ──
   const doSubmit = useCallback(async (currentAnswers) => {
@@ -468,15 +475,19 @@ export default function TestSession() {
         return
       }
 
-      if (q.type === TWO_PART_WRITTEN_TYPE) {
+      if (isTwoPartType(q.type)) {
         autoMaxScore += max
         const parsed = parseTwoPartAnswer(answer)
         const firstCorrect = q.twoPartCorrectAnswers?.[0] || ''
         const secondCorrect = q.twoPartCorrectAnswers?.[1] || ''
         const firstPoints = Number(q.twoPartPoints?.[0] || 1)
         const secondPoints = Number(q.twoPartPoints?.[1] || 1)
-        const firstMatched = compareCellAnswers(parsed.first, firstCorrect)
-        const secondMatched = compareCellAnswers(parsed.second, secondCorrect)
+        const firstMatched = q.type === TWO_PART_WRITTEN_TYPE
+          ? compareCellAnswers(parsed.first, firstCorrect)
+          : String(parsed.first || '').trim() === String(firstCorrect || '').trim()
+        const secondMatched = q.type === TWO_PART_WRITTEN_TYPE
+          ? compareCellAnswers(parsed.second, secondCorrect)
+          : String(parsed.second || '').trim() === String(secondCorrect || '').trim()
 
         if (test.testData.scoringType === 'rasch') {
           if (firstMatched) autoScore += Number.isFinite(firstPoints) && firstPoints > 0 ? firstPoints : 1
@@ -844,6 +855,7 @@ export default function TestSession() {
                         {question.type === 'multiple-choice' ? "Ko'p tanlovli" :
                           question.type === 'true-false' ? "To'g'ri/Noto'g'ri" :
                             question.type === TWO_PART_WRITTEN_TYPE ? '2 qismli yozma' :
+                            question.type === TWO_PART_MATH_TYPE ? '2 qismli matematik' :
                             question.type === 'essay' ? 'Yozma javob' : 'Qisqa javob'}
                       </span>
                     </div>
@@ -952,6 +964,43 @@ export default function TestSession() {
                               <CellAnswerInput
                                 value={twoPart.second}
                                 onChange={(next) => handleTwoPartAnswerChange(question.id, 'second', next)}
+                              />
+                            </div>
+                          </>
+                        )
+                      })()}
+                    </div>
+                  )}
+
+                  {question.type === TWO_PART_MATH_TYPE && (
+                    <div className="space-y-4">
+                      <div className="rounded-lg border border-sky-300 bg-sky-50 p-3 text-xs text-sky-900 leading-relaxed">
+                        Matematik ifodani oddiy formatda yozing: sqrt(x), x^2, 1/2, pi, sin(x).
+                      </div>
+                      {(() => {
+                        const twoPart = parseTwoPartAnswer(answers[question.id])
+                        const firstLabel = question.subQuestions?.[0] || 'a) Birinchi javob'
+                        const secondLabel = question.subQuestions?.[1] || 'b) Ikkinchi javob'
+                        return (
+                          <>
+                            <div>
+                              <label className="block text-sm font-medium text-slate-700 mb-2">{firstLabel}</label>
+                              <input
+                                type="text"
+                                value={twoPart.first}
+                                onChange={(e) => handleTwoPartAnswerChange(question.id, 'first', e.target.value)}
+                                placeholder="a) Matematik javob"
+                                className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-sm font-medium text-slate-700 mb-2">{secondLabel}</label>
+                              <input
+                                type="text"
+                                value={twoPart.second}
+                                onChange={(e) => handleTwoPartAnswerChange(question.id, 'second', e.target.value)}
+                                placeholder="b) Matematik javob"
+                                className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
                               />
                             </div>
                           </>
