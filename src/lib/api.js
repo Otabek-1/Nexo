@@ -40,7 +40,7 @@ export const apiRequest = async (endpoint, options = {}) => {
   
   if (body) fetchConfig.body = JSON.stringify(body)
   
-  const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1'
   const url = `${baseUrl}${endpoint}`
   
   try {
