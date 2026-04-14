@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
-import { getLeaderboard, getTestById } from '../lib/testStore'
+import { useParams } from 'react-router-dom'
+import { getLeaderboard } from '../lib/testStore'
 import QuestionDetailModal from '../components/QuestionDetailModal'
 
 const formatDateTime = (isoDate) => {
@@ -12,12 +12,7 @@ const formatDateTime = (isoDate) => {
 
 const getParticipantSecondary = (participant) => {
   if (!participant) return '-'
-  if (participant.phone) {
-    const cleaned = String(participant.phone)
-    if (cleaned.length < 4) return cleaned
-    return `${cleaned.slice(0, 4)}***${cleaned.slice(-2)}`
-  }
-
+  if (participant.phone) return participant.phone
   const fields = participant.fields || {}
   const extra = Object.entries(fields).find(([key, value]) => key !== 'fullName' && String(value || '').trim())
   return extra ? String(extra[1]) : '-'
@@ -29,30 +24,20 @@ export default function TestResults() {
   const [leaderboard, setLeaderboard] = useState({ ranked: [], pending: [] })
   const [loading, setLoading] = useState(true)
   const [selectedQuestion, setSelectedQuestion] = useState(null)
+  const [activeTab, setActiveTab] = useState('ranked')
 
   useEffect(() => {
-    let mounted = true
     const load = async () => {
       try {
-        setLoading(true)
-        const nextTest = await getTestById(id)
-        if (!mounted) return
-        setTest(nextTest)
-        if (nextTest?.id) {
-          const nextLeaderboard = await getLeaderboard(nextTest.id)
-          if (!mounted) return
-          setLeaderboard(nextLeaderboard || { ranked: [], pending: [] })
-        }
+        const data = await getLeaderboard(Number(id))
+        setLeaderboard(data)
       } catch (error) {
-        console.error('[TestResults] load failed:', error)
+        console.error('Failed to load leaderboard:', error)
       } finally {
-        if (mounted) setLoading(false)
+        setLoading(false)
       }
     }
     load()
-    return () => {
-      mounted = false
-    }
   }, [id])
 
   const ranked = leaderboard?.ranked || []
@@ -61,20 +46,10 @@ export default function TestResults() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
-        <div className="bg-white border border-slate-200 rounded-xl p-8 max-w-lg text-center">
-          <h1 className="text-2xl font-bold text-slate-800 mb-2">Yuklanmoqda...</h1>
-        </div>
-      </div>
-    )
-  }
-
-  if (!test) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
-        <div className="bg-white border border-slate-200 rounded-xl p-8 max-w-lg text-center">
-          <h1 className="text-2xl font-bold text-slate-800 mb-2">Test topilmadi</h1>
-          <Link to="/" className="inline-block mt-4 text-blue-600 hover:underline">Bosh sahifaga qaytish</Link>
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
+        <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-white/30 border-t-white mx-auto mb-4"></div>
+          <p className="text-white/80 text-center font-medium">Yuklanmoqda...</p>
         </div>
       </div>
     )
@@ -83,159 +58,226 @@ export default function TestResults() {
   const topThree = ranked.slice(0, 3)
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <header className="bg-white border-b border-slate-200">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-blue-600">Nexo</h1>
-            <p className="text-sm text-slate-600">Leaderboard & Results</p>
-          </div>
-          <div className="flex gap-2">
-            <Link to={`/test/${test.id}`} className="px-4 py-2 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-100">Testga o'tish</Link>
-            <Link to="/dashboard" className="px-4 py-2 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-100">Dashboard</Link>
-          </div>
-        </div>
-      </header>
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 relative overflow-hidden">
+      {/* Animated background elements */}
+      <div className="fixed inset-0 pointer-events-none">
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl animate-blob"></div>
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl animate-blob animation-delay-2000"></div>
+        <div className="absolute top-1/2 right-0 w-96 h-96 bg-pink-500/20 rounded-full blur-3xl animate-blob animation-delay-4000"></div>
+      </div>
 
-      <main className="max-w-6xl mx-auto px-6 py-10 space-y-6">
-        <div className="bg-white border border-slate-200 rounded-xl p-6">
-          <h2 className="text-2xl font-bold text-slate-800">{test.testData.title}</h2>
-          <p className="text-slate-600 mt-1">ID: {test.id}</p>
-          <div className="mt-3 flex flex-wrap gap-4 text-sm text-slate-700">
-            <span>Yakunlangan: {ranked.length}</span>
-            <span>Kutilayotgan review: {pending.length}</span>
-            <span>Jami topshirganlar: {ranked.length + pending.length}</span>
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        {/* Header */}
+        <div className="mb-16">
+          <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-8 mb-8">
+            <h1 className="text-4xl sm:text-5xl font-bold bg-gradient-to-r from-white via-purple-200 to-white bg-clip-text text-transparent mb-2">
+              Test Natijalari
+            </h1>
+            <p className="text-white/60 text-lg">Rasch modeli bilan hisoblangan o'quvchilar reytingi</p>
           </div>
-        </div>
 
-        {test.testData.scoringType === 'rasch' && raschStats && (
-          <>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-white border border-slate-200 rounded-xl p-5">
-                <p className="text-sm text-slate-500">Rasch statistikasi</p>
-                <p className="mt-2 text-3xl font-bold text-slate-900">{raschStats.totalSubmissions}</p>
-                <p className="text-sm text-slate-600">topshirilgan ish tahlil qilindi</p>
-              </div>
-              <div className="bg-white border border-emerald-200 rounded-xl p-5 bg-emerald-50/50">
-                <p className="text-sm text-emerald-700">Eng ko'p to'g'ri topilgan</p>
-                <p className="mt-2 text-lg font-semibold text-slate-900">{raschStats.easiestQuestion?.label || '-'}</p>
-                <p className="text-sm text-slate-600 mt-1">{raschStats.easiestQuestion ? `${Math.round(raschStats.easiestQuestion.accuracy * 100)}% aniqlik` : 'Maʼlumot yoʻq'}</p>
-                {raschStats.easiestQuestion?.contentPreview && (
-                  <p className="text-sm text-slate-500 mt-2">{raschStats.easiestQuestion.contentPreview}</p>
-                )}
-              </div>
-              <div className="bg-white border border-rose-200 rounded-xl p-5 bg-rose-50/50">
-                <p className="text-sm text-rose-700">Eng kam to'g'ri topilgan</p>
-                <p className="mt-2 text-lg font-semibold text-slate-900">{raschStats.hardestQuestion?.label || '-'}</p>
-                <p className="text-sm text-slate-600 mt-1">{raschStats.hardestQuestion ? `${Math.round(raschStats.hardestQuestion.accuracy * 100)}% aniqlik` : 'Maʼlumot yoʻq'}</p>
-                {raschStats.hardestQuestion?.contentPreview && (
-                  <p className="text-sm text-slate-500 mt-2">{raschStats.hardestQuestion.contentPreview}</p>
-                )}
-              </div>
-            </div>
+          {/* Top 3 Winners Card */}
+          {topThree.length > 0 && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {topThree.map((submission, index) => {
+                const podiumHeights = ['h-32', 'h-40', 'h-24']
+                const medals = ['🥇', '🥈', '🥉']
+                const colors = [
+                  'from-yellow-400 to-yellow-600',
+                  'from-slate-300 to-slate-500',
+                  'from-orange-400 to-orange-600'
+                ]
 
-            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-              <div className="px-6 py-4 border-b border-slate-200 bg-slate-50">
-                <h3 className="text-lg font-semibold text-slate-800">Savollar Kesimidagi Statistika</h3>
-              </div>
-              {raschStats.questionStats?.length > 0 ? (
-                <div className="divide-y divide-slate-200">
-                  {raschStats.questionStats
-                    .slice()
-                    .sort((left, right) => right.accuracy - left.accuracy || right.correctCount - left.correctCount)
-                    .map((question) => (
-                      <div key={question.questionId} className="px-6 py-4 flex items-start justify-between gap-4 hover:bg-slate-50 transition">
-                        <div className="min-w-0 flex-1">
-                          <p className="font-semibold text-slate-800">{question.label}</p>
-                          <p className="text-sm text-slate-600 mt-1">{question.contentPreview || 'Preview mavjud emas'}</p>
-                        </div>
-                        <div className="text-right shrink-0">
-                          <p className="text-lg font-bold text-slate-900">{Math.round(question.accuracy * 100)}%</p>
-                          <p className="text-xs text-slate-500">{question.correctCount} to'g'ri / {question.totalCount} urinish</p>
-                          <button
-                            onClick={() => setSelectedQuestion(question.questionId)}
-                            className="mt-2 text-xs px-3 py-1 rounded bg-blue-100 text-blue-700 hover:bg-blue-200"
-                          >
-                            Batafsil
-                          </button>
-                        </div>
+                return (
+                  <div key={submission.id} className="flex flex-col items-center">
+                    <div className={`backdrop-blur-xl bg-gradient-to-br ${colors[index]} bg-opacity-20 border border-white/30 rounded-2xl p-6 w-full mb-4 transform transition hover:scale-105`}>
+                      <div className="text-5xl mb-2">{medals[index]}</div>
+                      <h3 className="text-xl font-bold text-white">{submission.participant.fields.fullName}</h3>
+                      <p className="text-white/70 text-sm">{getParticipantSecondary(submission.participant)}</p>
+                      <div className="mt-4 text-3xl font-bold bg-gradient-to-r from-white to-white/80 bg-clip-text text-transparent">
+                        {Math.round(submission.score * 100) / 100}
                       </div>
-                    ))}
+                    </div>
+                    <div className={`w-full ${podiumHeights[index]} bg-gradient-to-t from-purple-500/40 to-transparent border border-purple-400/30 rounded-t-2xl flex items-end justify-center pb-4`}>
+                      <span className="text-2xl font-bold text-white">#{index + 1}</span>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Rasch Stats Section */}
+        {raschStats && (
+          <div className="mb-16">
+            <div className="backdrop-blur-xl bg-gradient-to-br from-white/10 to-white/5 border border-white/20 rounded-3xl p-8 mb-8">
+              <h2 className="text-3xl font-bold text-white mb-6">Rasch Statistikasi</h2>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                {[
+                  { label: 'Jami o\'quvchilar', value: raschStats.submissionCount || 0, icon: '👥' },
+                  { label: 'Jami savollar', value: raschStats.itemCount || 0, icon: '📋' },
+                  { label: 'Qiyinlik indeksi', value: (raschStats.meanDifficulty || 0).toFixed(2), icon: '📊' }
+                ].map((stat, idx) => (
+                  <div key={idx} className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-2xl p-6 hover:bg-white/20 transition">
+                    <div className="text-4xl mb-3">{stat.icon}</div>
+                    <p className="text-white/70 text-sm mb-1">{stat.label}</p>
+                    <p className="text-3xl font-bold text-white">{stat.value}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Question Stats */}
+              {raschStats.questionStats?.length > 0 && (
+                <div>
+                  <h3 className="text-xl font-semibold text-white mb-4">Savollar Tahlili</h3>
+                  <div className="space-y-3 max-h-96 overflow-y-auto">
+                    {raschStats.questionStats
+                      .slice()
+                      .sort((a, b) => b.accuracy - a.accuracy)
+                      .map((q) => (
+                        <div key={q.questionId} className="group backdrop-blur-xl bg-white/10 border border-white/20 rounded-2xl p-4 hover:bg-white/20 hover:border-white/40 transition cursor-pointer">
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-white truncate">{q.label}</p>
+                              <p className="text-sm text-white/60 truncate mt-1">{q.contentPreview}</p>
+                            </div>
+                            <div className="text-right ml-4 shrink-0">
+                              <p className="text-2xl font-bold bg-gradient-to-r from-green-400 to-emerald-400 bg-clip-text text-transparent">
+                                {Math.round(q.accuracy * 100)}%
+                              </p>
+                              <p className="text-xs text-white/50 mt-1">{q.correctCount}/{q.totalCount}</p>
+                              <button
+                                onClick={() => setSelectedQuestion(q.questionId)}
+                                className="mt-3 text-xs px-3 py-1 rounded-lg bg-blue-500/30 hover:bg-blue-500/50 text-blue-300 border border-blue-400/30 transition"
+                              >
+                                Batafsil
+                              </button>
+                            </div>
+                          </div>
+                          <div className="mt-3 w-full bg-white/10 rounded-full h-2 overflow-hidden">
+                            <div
+                              className="bg-gradient-to-r from-green-400 to-emerald-400 h-2 rounded-full transition-all duration-500"
+                              style={{ width: `${q.accuracy * 100}%` }}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                  </div>
                 </div>
-              ) : (
-                <div className="px-6 py-8 text-slate-600">Rasch statistikasi hali tayyor emas.</div>
               )}
             </div>
-          </>
+          </div>
         )}
 
-        {topThree.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {topThree.map((entry, index) => (
-              <div key={entry.id} className="bg-white border border-slate-200 rounded-xl p-5">
-                <p className="text-sm text-slate-500">#{index + 1} o'rin</p>
-                <p className="text-lg font-semibold text-slate-800 mt-1">{entry.participant?.fullName || 'Ismsiz participant'}</p>
-                <p className="text-sm text-slate-600">{getParticipantSecondary(entry.participant)}</p>
-                <p className="mt-3 text-2xl font-bold text-emerald-700">{entry.finalScore}</p>
-              </div>
+        {/* Leaderboard Tabs */}
+        <div className="backdrop-blur-xl bg-gradient-to-br from-white/10 to-white/5 border border-white/20 rounded-3xl overflow-hidden">
+          <div className="flex border-b border-white/10">
+            {['ranked', 'pending'].map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`flex-1 py-4 px-6 font-semibold transition ${
+                  activeTab === tab
+                    ? 'bg-white/20 border-b-2 border-purple-400 text-white'
+                    : 'text-white/60 hover:text-white/80'
+                }`}
+              >
+                {tab === 'ranked' ? '🏆 Reytingli' : '⏳ Ijro muloyim'}
+              </button>
             ))}
           </div>
-        )}
 
-        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-200 bg-slate-50">
-            <h3 className="text-lg font-semibold text-slate-800">To'liq Reyting</h3>
+          <div className="p-8">
+            {activeTab === 'ranked' ? (
+              <div className="space-y-3">
+                {ranked.length > 0 ? (
+                  ranked.map((submission, idx) => (
+                    <div
+                      key={submission.id}
+                      className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-2xl p-6 hover:bg-white/20 hover:border-white/40 transition"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4 flex-1 min-w-0">
+                          <div className="text-3xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent w-12 text-center">
+                            #{idx + 1}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <h3 className="font-semibold text-white truncate">{submission.participant.fields.fullName}</h3>
+                            <p className="text-sm text-white/60">{getParticipantSecondary(submission.participant)}</p>
+                          </div>
+                        </div>
+                        <div className="text-right ml-4 shrink-0">
+                          <p className="text-2xl font-bold bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">
+                            {Math.round(submission.score * 100) / 100}
+                          </p>
+                          <p className="text-xs text-white/50">{formatDateTime(submission.createdAt)}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-12 text-white/60">Reytingli o'quvchilar yo'q</div>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {pending.length > 0 ? (
+                  pending.map((submission) => (
+                    <div
+                      key={submission.id}
+                      className="backdrop-blur-xl bg-yellow-500/10 border border-yellow-400/30 rounded-2xl p-6 hover:bg-yellow-500/20 transition"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-white truncate">{submission.participant.fields.fullName}</h3>
+                          <p className="text-sm text-white/60">{getParticipantSecondary(submission.participant)}</p>
+                        </div>
+                        <div className="text-right ml-4 shrink-0">
+                          <span className="inline-block px-3 py-1 bg-yellow-500/30 border border-yellow-400/50 rounded-full text-yellow-300 text-xs font-medium">
+                            Ijro muloyim
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-12 text-white/60">Ijro muloyimda o'quvchilar yo'q</div>
+                )}
+              </div>
+            )}
           </div>
-
-          {ranked.length > 0 ? (
-            <div className="divide-y divide-slate-200">
-              {ranked.map((entry, index) => (
-                <div key={entry.id} className="px-6 py-4 flex items-center justify-between gap-4">
-                  <div className="min-w-0">
-                    <p className="font-semibold text-slate-800">#{index + 1} {entry.participant?.fullName || 'Ismsiz participant'}</p>
-                    <p className="text-sm text-slate-600">{getParticipantSecondary(entry.participant)} | {formatDateTime(entry.submittedAt)}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xl font-bold text-slate-900">{entry.finalScore}</p>
-                    <p className="text-xs text-slate-500">final score</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="px-6 py-8 text-slate-600">Hali yakuniy natijalar yo'q.</div>
-          )}
         </div>
+      </div>
 
-        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-200 bg-slate-50">
-            <h3 className="text-lg font-semibold text-slate-800">Kutilayotgan Tekshiruvlar</h3>
-          </div>
-          {pending.length > 0 ? (
-            <div className="divide-y divide-slate-200">
-              {pending.map((entry) => (
-                <div key={entry.id} className="px-6 py-4 flex items-center justify-between gap-4">
-                  <div>
-                    <p className="font-medium text-slate-800">{entry.participant?.fullName || 'Ismsiz participant'}</p>
-                    <p className="text-sm text-slate-600">{getParticipantSecondary(entry.participant)} | {formatDateTime(entry.submittedAt)}</p>
-                  </div>
-                  <span className="text-xs px-2 py-1 rounded bg-amber-100 text-amber-800">Pending Review</span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="px-6 py-8 text-slate-600">Pending submission yo'q.</div>
-          )}
-        </div>
+      {selectedQuestion && (
+        <QuestionDetailModal
+          testId={id}
+          questionId={selectedQuestion}
+          onClose={() => setSelectedQuestion(null)}
+        />
+      )}
 
-        {selectedQuestion && (
-          <QuestionDetailModal
-            testId={test.id}
-            questionId={selectedQuestion}
-            onClose={() => setSelectedQuestion(null)}
-          />
-        )}
-      </main>
+      <style jsx global>{`
+        @keyframes blob {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          33% { transform: translate(30px, -50px) scale(1.1); }
+          66% { transform: translate(-20px, 20px) scale(0.9); }
+        }
+
+        .animate-blob {
+          animation: blob 7s infinite;
+        }
+
+        .animation-delay-2000 {
+          animation-delay: 2s;
+        }
+
+        .animation-delay-4000 {
+          animation-delay: 4s;
+        }
+      `}</style>
     </div>
   )
 }
