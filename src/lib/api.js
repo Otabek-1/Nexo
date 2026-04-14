@@ -40,7 +40,7 @@ export const apiRequest = async (endpoint, options = {}) => {
   
   if (body) fetchConfig.body = JSON.stringify(body)
   
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'https://nexo-server-lgzw.onrender.com/api/v1'
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || 'https://nexo-server-jwjb.onrender.com/api/v1'
   const url = `${baseUrl}${endpoint}`
   
   try {
