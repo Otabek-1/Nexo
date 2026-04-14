@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { getLeaderboard, getTestById } from '../lib/testStore'
+import QuestionDetailModal from '../components/QuestionDetailModal'
 
 const formatDateTime = (isoDate) => {
   if (!isoDate) return '-'
@@ -27,6 +28,7 @@ export default function TestResults() {
   const [test, setTest] = useState(null)
   const [leaderboard, setLeaderboard] = useState({ ranked: [], pending: [] })
   const [loading, setLoading] = useState(true)
+  const [selectedQuestion, setSelectedQuestion] = useState(null)
 
   useEffect(() => {
     let mounted = true
@@ -142,14 +144,20 @@ export default function TestResults() {
                     .slice()
                     .sort((left, right) => right.accuracy - left.accuracy || right.correctCount - left.correctCount)
                     .map((question) => (
-                      <div key={question.questionId} className="px-6 py-4 flex items-start justify-between gap-4">
-                        <div className="min-w-0">
+                      <div key={question.questionId} className="px-6 py-4 flex items-start justify-between gap-4 hover:bg-slate-50 transition">
+                        <div className="min-w-0 flex-1">
                           <p className="font-semibold text-slate-800">{question.label}</p>
                           <p className="text-sm text-slate-600 mt-1">{question.contentPreview || 'Preview mavjud emas'}</p>
                         </div>
                         <div className="text-right shrink-0">
                           <p className="text-lg font-bold text-slate-900">{Math.round(question.accuracy * 100)}%</p>
                           <p className="text-xs text-slate-500">{question.correctCount} to'g'ri / {question.totalCount} urinish</p>
+                          <button
+                            onClick={() => setSelectedQuestion(question.questionId)}
+                            className="mt-2 text-xs px-3 py-1 rounded bg-blue-100 text-blue-700 hover:bg-blue-200"
+                          >
+                            Batafsil
+                          </button>
                         </div>
                       </div>
                     ))}
@@ -219,6 +227,14 @@ export default function TestResults() {
             <div className="px-6 py-8 text-slate-600">Pending submission yo'q.</div>
           )}
         </div>
+
+        {selectedQuestion && (
+          <QuestionDetailModal
+            testId={test.id}
+            questionId={selectedQuestion}
+            onClose={() => setSelectedQuestion(null)}
+          />
+        )}
       </main>
     </div>
   )
