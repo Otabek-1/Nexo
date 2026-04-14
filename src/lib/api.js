@@ -21,40 +21,31 @@ const withTimeout = async (promise, timeoutMs = config.requestTimeoutMs) => {
   }
 }
 
-export const apiRequest = async (path, { method = 'GET', body, headers = {}, auth = true } = {}) => {
-  const token = getAccessToken()
-  const finalHeaders = {
-    ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
-    ...headers
+export const apiRequest = async (endpoint, options = {}) => {
+  const { auth = true, method = 'GET', body = null } = options
+  
+  const headers = {
+    'Content-Type': 'application/json',
   }
-  if (auth && token) {
-    finalHeaders.Authorization = `Bearer ${token}`
+  
+  if (auth) {
+    const token = localStorage.getItem('access_token')
+    if (token) headers['Authorization'] = `Bearer ${token}`
   }
-
-  const response = await withTimeout((signal) =>
-    fetch(`${config.apiBaseUrl}${path}`, {
-      method,
-      headers: finalHeaders,
-      body: body !== undefined ? JSON.stringify(body) : undefined,
-      signal
-    })
-  )
-
-  let payload = null
-  try {
-    payload = await response.json()
-  } catch {
-    payload = null
+  
+  const config = {
+    method,
+    headers,
   }
-
+  
+  if (body) config.body = JSON.stringify(body)
+  
+  const response = await fetch(`${import.meta.env.VITE_API_URL || ''}${endpoint}`, config)
+  
   if (!response.ok) {
-    const detail = payload?.detail || payload?.message || `HTTP ${response.status}`
-    const err = new Error(detail)
-    err.status = response.status
-    err.payload = payload
-    throw err
+    throw new Error(`API error: ${response.status}`)
   }
-
-  return payload
+  
+  return response.json()
 }
 
