@@ -184,7 +184,7 @@ export default function TestResults() {
                     : 'text-white/60 hover:text-white/80'
                 }`}
               >
-                {tab === 'ranked' ? '📊 Reyting Jadavali' : '⏳ Tekshirish Jarayonida'}
+                {tab === 'ranked' ? '📊 Reyting Jadvali' : '⏳ Tekshirish Jarayonida'}
               </button>
             ))}
           </div>
