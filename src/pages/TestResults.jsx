@@ -236,14 +236,14 @@ export default function TestResults() {
                         </div>
                         <div className="text-right ml-4 shrink-0">
                           <span className="inline-block px-3 py-1 bg-yellow-500/30 border border-yellow-400/50 rounded-full text-yellow-300 text-xs font-medium">
-                            Ijro muloyim
+                            -
                           </span>
                         </div>
                       </div>
                     </div>
                   ))
                 ) : (
-                  <div className="text-center py-12 text-white/60">Ijro muloyimda o'quvchilar yo'q</div>
+                  <div className="text-center py-12 text-white/60">O'quvchilar yo'q</div>
                 )}
               </div>
             )}
