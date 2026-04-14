@@ -29,23 +29,33 @@ export const apiRequest = async (endpoint, options = {}) => {
   }
   
   if (auth) {
-    const token = localStorage.getItem('access_token')
+    const token = getAccessToken()
     if (token) headers['Authorization'] = `Bearer ${token}`
   }
   
-  const config = {
+  const fetchConfig = {
     method,
     headers,
   }
   
-  if (body) config.body = JSON.stringify(body)
+  if (body) fetchConfig.body = JSON.stringify(body)
   
-  const response = await fetch(`${import.meta.env.VITE_API_URL || ''}${endpoint}`, config)
+  const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
+  const url = `${baseUrl}${endpoint}`
   
-  if (!response.ok) {
-    throw new Error(`API error: ${response.status}`)
+  try {
+    const response = await fetch(url, fetchConfig)
+    
+    if (!response.ok) {
+      const error = await response.text()
+      console.error(`API ${response.status}:`, error)
+      throw new Error(`API error: ${response.status} - ${error}`)
+    }
+    
+    return await response.json()
+  } catch (error) {
+    console.error('Request failed:', error)
+    throw error
   }
-  
-  return response.json()
 }
 
