@@ -18,6 +18,11 @@ const getParticipantSecondary = (participant) => {
   return extra ? String(extra[1]) : '-'
 }
 
+const getParticipantName = (participant) => {
+  if (!participant) return '-'
+  return participant.fullName || participant.fields?.fullName || '-'
+}
+
 export default function TestResults() {
   const { id } = useParams()
   const [test, setTest] = useState(null)
@@ -92,7 +97,7 @@ export default function TestResults() {
                   <div key={submission.id} className="flex flex-col items-center">
                     <div className={`backdrop-blur-xl bg-gradient-to-br ${colors[index]} bg-opacity-20 border border-white/30 rounded-2xl p-6 w-full mb-4 transform transition hover:scale-105`}>
                       <div className="text-5xl mb-2">{medals[index]}</div>
-                      <h3 className="text-xl font-bold text-white">{submission.participant.fields.fullName}</h3>
+                      <h3 className="text-xl font-bold text-white">{getParticipantName(submission.participant)}</h3>
                       <p className="text-white/70 text-sm">{getParticipantSecondary(submission.participant)}</p>
                       <div className="mt-4 text-3xl font-bold bg-gradient-to-r from-white to-white/80 bg-clip-text text-transparent">
                         {Math.round(submission.score * 100) / 100}
@@ -204,7 +209,7 @@ export default function TestResults() {
                             #{idx + 1}
                           </div>
                           <div className="min-w-0 flex-1">
-                            <h3 className="font-semibold text-white truncate">{submission.participant.fields.fullName}</h3>
+                            <h3 className="font-semibold text-white truncate">{getParticipantName(submission.participant)}</h3>
                             <p className="text-sm text-white/60">{getParticipantSecondary(submission.participant)}</p>
                           </div>
                         </div>
@@ -231,7 +236,7 @@ export default function TestResults() {
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex-1 min-w-0">
-                          <h3 className="font-semibold text-white truncate">{submission.participant.fields.fullName}</h3>
+                          <h3 className="font-semibold text-white truncate">{getParticipantName(submission.participant)}</h3>
                           <p className="text-sm text-white/60">{getParticipantSecondary(submission.participant)}</p>
                         </div>
                         <div className="text-right ml-4 shrink-0">
