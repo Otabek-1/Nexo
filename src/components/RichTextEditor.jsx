@@ -1,27 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-
-// ─── KaTeX loader ─────────────────────────────────────────────────────────────
-let _katexPromise = null
-const loadKatex = () => {
-  if (_katexPromise) return _katexPromise
-  _katexPromise = new Promise((resolve) => {
-    if (window.katex) { resolve(window.katex); return }
-    if (!document.getElementById('katex-css')) {
-      const link = document.createElement('link')
-      link.id = 'katex-css'
-      link.rel = 'stylesheet'
-      link.href = 'https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css'
-      document.head.appendChild(link)
-    }
-    const script = document.createElement('script')
-    script.src = 'https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js'
-    script.async = true
-    script.onload = () => resolve(window.katex)
-    script.onerror = () => resolve(null)
-    document.head.appendChild(script)
-  })
-  return _katexPromise
-}
+import katex from 'katex'
+import 'katex/dist/katex.min.css'
 import { isRichContentEmpty, sanitizeRichContent } from '../lib/richContent'
 
 // ─── Math / Symbol Palettes ──────────────────────────────────────────────────
@@ -409,9 +388,9 @@ const LatexInput = ({ onInsert }) => {
       ? 'display:block;text-align:center;margin:10px 0;'
       : 'display:inline-block;vertical-align:middle;'
     let rendered = latex
-    if (window.katex) {
+    if (katex) {
       try {
-        rendered = window.katex.renderToString(latex, {
+        rendered = katex.renderToString(latex, {
           throwOnError: false,
           displayMode: display,
           output: 'html',
@@ -839,7 +818,6 @@ export default function RichTextEditor({
   const [showSymbols, setShowSymbols] = useState(true)
 
   // KaTeX ni oldindan yuklash (editor ochilganda formulalar tayyor bo'lsin)
-  useEffect(() => { loadKatex() }, [])
 
   const normalizedValue = useMemo(() => sanitizeRichContent(value), [value])
 

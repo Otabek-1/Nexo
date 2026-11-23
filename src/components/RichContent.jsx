@@ -1,30 +1,7 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
+import katex from 'katex'
+import 'katex/dist/katex.min.css'
 import { sanitizeRichContent } from '../lib/richContent'
-
-// ─── KaTeX loader ─────────────────────────────────────────────────────────────
-
-let katexPromise = null
-
-const loadKatex = () => {
-  if (katexPromise) return katexPromise
-  katexPromise = new Promise((resolve) => {
-    if (window.katex) { resolve(window.katex); return }
-    if (!document.getElementById('katex-css')) {
-      const link = document.createElement('link')
-      link.id = 'katex-css'
-      link.rel = 'stylesheet'
-      link.href = 'https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css'
-      document.head.appendChild(link)
-    }
-    const script = document.createElement('script')
-    script.src = 'https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js'
-    script.async = true
-    script.onload = () => resolve(window.katex)
-    script.onerror = () => resolve(null)
-    document.head.appendChild(script)
-  })
-  return katexPromise
-}
 
 // ─── KaTeX render ─────────────────────────────────────────────────────────────
 
@@ -95,9 +72,7 @@ export default function RichContent({ html, className = '' }) {
   // 2) innerHTML yangilangandan keyin KaTeX render
   useEffect(() => {
     if (!safeHtml) return
-    loadKatex().then((katex) => {
-      if (containerRef.current) renderLatex(containerRef.current, katex)
-    })
+    if (containerRef.current) renderLatex(containerRef.current, katex)
   }, [safeHtml])
 
   // 3) dangerouslySetInnerHTML YO'Q — div faqat ref bilan
