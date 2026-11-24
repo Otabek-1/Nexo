@@ -12,6 +12,7 @@ import {
   normalizeCellToken,
   tokenizeIntoCells
 } from '../lib/cellAnswer'
+import { getModuleProgress, getNextModuleIndex } from '../lib/moduleUtils'
 
 const TWO_PART_WRITTEN_TYPE = 'two-part-written'
 const TWO_PART_MATH_TYPE = 'two-part-math'
@@ -102,21 +103,6 @@ const isRoutingAnswerCorrect = (question, rawAnswer) => {
     return matches(answer.first, correctFirst) && matches(answer.second, correctSecond)
   }
   return false
-}
-
-const getNextModuleIndex = (modules, currentModuleIndex, shuffledQuestions, answers) => {
-  const nextIndex = currentModuleIndex + 1
-  const previous = modules[currentModuleIndex]
-  if (previous?.routing !== 'adaptive') return nextIndex
-
-  const previousQuestions = shuffledQuestions.filter(({ item }) => item.moduleId === previous.id)
-  const correctCount = previousQuestions.filter(({ item }) => isRoutingAnswerCorrect(item, answers[item.id])).length
-  const ratio = previousQuestions.length ? correctCount / previousQuestions.length : 0
-  const targetDifficulty = ratio >= 0.75 ? 'hard' : 'easy'
-  const routedIndex = modules.findIndex(
-    (module, index) => index > currentModuleIndex && module.difficulty === targetDifficulty
-  )
-  return routedIndex >= 0 ? routedIndex : nextIndex
 }
 
 function CellAnswerInput({ value, onChange, cells = 30 }) {
@@ -415,6 +401,10 @@ export default function TestSession() {
     [test]
   )
   const currentModule = modules[currentModuleIndex] || null
+  const moduleProgress = useMemo(
+    () => getModuleProgress(modules, currentModuleIndex),
+    [modules, currentModuleIndex]
+  )
   const activeShuffledQuestions = useMemo(() => {
     if (!currentModule) return shuffledQuestions
     return shuffledQuestions.filter(({ item }) => item.moduleId === currentModule.id)
@@ -616,7 +606,9 @@ export default function TestSession() {
 
     if (breakEndTs) {
       if (breakEndTs <= nowTs) {
-        const nextIndex = getNextModuleIndex(modules, currentModuleIndex, shuffledQuestions, answers)
+        const nextIndex = getNextModuleIndex(
+          modules, currentModuleIndex, shuffledQuestions, answers, isRoutingAnswerCorrect
+        )
         setBreakEndTs(null)
         setCurrentIdx(0)
         if (nextIndex < modules.length) {
@@ -625,6 +617,8 @@ export default function TestSession() {
           setModuleEndTs(Date.now() + minutes * 60 * 1000)
         } else {
           setModuleEndTs(null)
+          setAutoSubmitting(true)
+          doSubmit(answers)
         }
       }
       return
@@ -632,23 +626,36 @@ export default function TestSession() {
 
     if (moduleEndTs && moduleEndTs <= nowTs) {
       const current = modules[currentModuleIndex]
+      const nextIndex = getNextModuleIndex(
+        modules, currentModuleIndex, shuffledQuestions, answers, isRoutingAnswerCorrect
+      )
       const breakMinutes = Number(current?.breakAfterMinutes || 0)
-      if (breakMinutes > 0 && currentModuleIndex < modules.length - 1) {
+      if (breakMinutes > 0 && nextIndex < modules.length) {
         setModuleEndTs(null)
         setBreakEndTs(Date.now() + breakMinutes * 60 * 1000)
-      } else {
-        const nextIndex = getNextModuleIndex(modules, currentModuleIndex, shuffledQuestions, answers)
+      } else if (nextIndex < modules.length) {
         setCurrentIdx(0)
-        if (nextIndex < modules.length) {
-          setCurrentModuleIndex(nextIndex)
-          const minutes = Number(modules[nextIndex]?.durationMinutes || 32)
-          setModuleEndTs(Date.now() + minutes * 60 * 1000)
-        } else {
-          setModuleEndTs(null)
-        }
+        setCurrentModuleIndex(nextIndex)
+        const minutes = Number(modules[nextIndex]?.durationMinutes || 32)
+        setModuleEndTs(Date.now() + minutes * 60 * 1000)
+      } else {
+        setModuleEndTs(null)
+        setAutoSubmitting(true)
+        doSubmit(answers)
       }
     }
-  }, [started, submitted, modules, breakEndTs, moduleEndTs, currentModuleIndex, nowTs, shuffledQuestions, answers])
+  }, [
+    started,
+    submitted,
+    modules,
+    breakEndTs,
+    moduleEndTs,
+    currentModuleIndex,
+    nowTs,
+    shuffledQuestions,
+    answers,
+    doSubmit,
+  ])
 
   useEffect(() => {
     if (!started || submitted) return
@@ -756,7 +763,9 @@ export default function TestSession() {
   }
 
   const handleFinishModule = () => {
-    const nextIndex = getNextModuleIndex(modules, currentModuleIndex, shuffledQuestions, answers)
+    const nextIndex = getNextModuleIndex(
+      modules, currentModuleIndex, shuffledQuestions, answers, isRoutingAnswerCorrect
+    )
     if (nextIndex >= modules.length) {
       setConfirmingModule(false)
       return doSubmit(answers)
@@ -785,7 +794,10 @@ export default function TestSession() {
   }, [activeShuffledQuestions, answers])
 
   const answeredCount = (activeShuffledQuestions.length || 0) - unansweredCount
-  const hasNextModule = modules.length > 0 && currentModuleIndex < modules.length - 1
+  const nextModuleIndex = getNextModuleIndex(
+    modules, currentModuleIndex, shuffledQuestions, answers, isRoutingAnswerCorrect
+  )
+  const hasNextModule = modules.length > 0 && nextModuleIndex < modules.length
 
   // ── Not found ──
   if (loading) {
@@ -985,7 +997,7 @@ export default function TestSession() {
             {currentModule && (
               <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
                 <span className="text-sm font-semibold text-slate-700">
-                  Modul {currentModuleIndex + 1}/{modules.length}: {currentModule.title}
+                  Modul {moduleProgress.current}/{moduleProgress.total}: {currentModule.title}
                 </span>
                 {moduleEndTs && (
                   <span className="font-mono text-sm font-bold text-slate-800">{formatCountdown(moduleEndTs - nowTs)}</span>

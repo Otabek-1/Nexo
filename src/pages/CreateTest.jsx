@@ -8,6 +8,7 @@ import RichTextEditor from '../components/RichTextEditor'
 import ButtonSpinner from '../components/ButtonSpinner'
 import { isRichContentEmpty } from '../lib/richContent'
 import { normalizeCellAnswerText, tokenizeIntoCells } from '../lib/cellAnswer'
+import { getModulesDuration } from '../lib/moduleUtils'
 import { parseModuleQuestionFile } from '../lib/questionImport'
 
 const toDateTimeLocal = (value) => {
@@ -40,17 +41,6 @@ const formatApiError = (error) => {
   }
   if (typeof error?.message === 'string' && error.message.trim()) return error.message
   return 'Imtihonni saqlashda xatolik yuz berdi'
-}
-
-const getModulesDuration = (modules) => {
-  if (!Array.isArray(modules) || modules.length === 0) return null
-  return modules.reduce((total, module, index) => {
-    const moduleMinutes = Math.max(1, Number(module.durationMinutes) || 1)
-    const breakMinutes = index < modules.length - 1
-      ? Math.max(0, Number(module.breakAfterMinutes) || 0)
-      : 0
-    return total + moduleMinutes + breakMinutes
-  }, 0)
 }
 
 export default function CreateTest() {
@@ -1078,8 +1068,11 @@ export default function CreateTest() {
                   ) : (
                     <div className="space-y-2">
                       <p className="text-xs text-slate-600">
-                        Umumiy imtihon vaqti modullar va modullar orasidagi tanaffusdan hisoblanadi: <strong>{modulesDuration} daqiqa</strong>.
+                        Umumiy imtihon vaqti: <strong>{modulesDuration} daqiqa</strong>.
                         Oxirgi moduldan keyingi tanaffus hisobga olinmaydi.
+                      </p>
+                      <p className="text-xs text-indigo-700">
+                        Adaptive ni faqat yo‘nalish tanlaydigan modulda yoqing (odatda Modul 1). Bir xil fan bo‘yicha Oson/Qiyin modullar muqobil yo‘llar hisoblanadi; ikkalasini ham ketma-ket topshirish shart emas.
                       </p>
                       {testData.modules.map((module, index) => (
                         <div key={module.id} className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-2 rounded-lg border border-slate-200 p-3">
@@ -1103,7 +1096,7 @@ export default function CreateTest() {
                           <input type="number" min="0" value={module.breakAfterMinutes} onChange={(e) => updateModule(module.id, 'breakAfterMinutes', Number(e.target.value))} className="px-2 py-1.5 border border-slate-300 rounded-md text-xs" title="Keyingi modulgacha tanaffus (daqiqa)" />
                           <select value={module.routing} onChange={(e) => updateModule(module.id, 'routing', e.target.value)} className="px-2 py-1.5 border border-slate-300 rounded-md text-xs">
                             <option value="none">Odatiy</option>
-                            <option value="adaptive">Adaptive</option>
+                            <option value="adaptive">Adaptive yo‘naltirish</option>
                           </select>
                           <span className="flex items-center px-2 text-xs text-slate-600">
                             Savollar: {questions.filter(question => question.moduleId === module.id).length}
