@@ -113,7 +113,7 @@ export const getCurrentSession = () => {
     const expiresAt = new Date(session.expiresAt).getTime()
     const now = Date.now()
 
-    if (now > expiresAt) {
+    if (!Number.isFinite(expiresAt) || (now > expiresAt && !localStorage.getItem(AUTH_REFRESH_KEY))) {
       clearLocalAuth()
       return null
     }
@@ -124,7 +124,9 @@ export const getCurrentSession = () => {
   }
 }
 
-export const isAuthenticated = () => Boolean(getCurrentSession() && localStorage.getItem(AUTH_TOKEN_KEY))
+export const isAuthenticated = () => Boolean(
+  getCurrentSession() && (localStorage.getItem(AUTH_TOKEN_KEY) || localStorage.getItem(AUTH_REFRESH_KEY))
+)
 
 export const getCurrentUser = () => {
   try {

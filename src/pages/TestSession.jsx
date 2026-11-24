@@ -85,6 +85,40 @@ const isQuestionAnswered = (question, rawAnswer) => {
   return rawAnswer !== undefined && rawAnswer !== ''
 }
 
+const isRoutingAnswerCorrect = (question, rawAnswer) => {
+  if (question.type === 'multiple-choice' || question.type === 'true-false') {
+    return String(rawAnswer ?? '') === String(question.correctAnswer ?? '')
+  }
+  if (question.type === SAT_MATH_INPUT_TYPE) {
+    const acceptedAnswers = question.acceptedAnswers || [question.correctAnswer]
+    return acceptedAnswers.some(answer => String(rawAnswer ?? '').trim() === String(answer ?? '').trim())
+  }
+  if (isTwoPartType(question.type)) {
+    const answer = parseTwoPartAnswer(rawAnswer)
+    const [correctFirst = '', correctSecond = ''] = question.twoPartCorrectAnswers || []
+    const matches = question.type === TWO_PART_WRITTEN_TYPE ? compareCellAnswers : (left, right) => (
+      String(left ?? '').trim().toLowerCase() === String(right ?? '').trim().toLowerCase()
+    )
+    return matches(answer.first, correctFirst) && matches(answer.second, correctSecond)
+  }
+  return false
+}
+
+const getNextModuleIndex = (modules, currentModuleIndex, shuffledQuestions, answers) => {
+  const nextIndex = currentModuleIndex + 1
+  const previous = modules[currentModuleIndex]
+  if (previous?.routing !== 'adaptive') return nextIndex
+
+  const previousQuestions = shuffledQuestions.filter(({ item }) => item.moduleId === previous.id)
+  const correctCount = previousQuestions.filter(({ item }) => isRoutingAnswerCorrect(item, answers[item.id])).length
+  const ratio = previousQuestions.length ? correctCount / previousQuestions.length : 0
+  const targetDifficulty = ratio >= 0.75 ? 'hard' : 'easy'
+  const routedIndex = modules.findIndex(
+    (module, index) => index > currentModuleIndex && module.difficulty === targetDifficulty
+  )
+  return routedIndex >= 0 ? routedIndex : nextIndex
+}
+
 function CellAnswerInput({ value, onChange, cells = 30 }) {
   const tokens = useMemo(() => answerTextToCells(value, cells), [value, cells])
   const refs = useRef([])
@@ -233,20 +267,24 @@ function QuestionNav({ questions, answers, currentIdx, onGoto }) {
 
 // ─── Confirm modal ───────────────────────────────────────────────────────────
 
-function ConfirmModal({ unanswered, onConfirm, onCancel, submitting = false }) {
+function ConfirmModal({ unanswered, onConfirm, onCancel, submitting = false, moduleMode = false }) {
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-md w-full p-6">
         <div className="text-2xl mb-3">⚠️</div>
-        <h3 className="text-lg font-bold text-slate-800 mb-2">Testni yakunlash</h3>
+        <h3 className="text-lg font-bold text-slate-800 mb-2">
+          {moduleMode ? 'Modulni yakunlash' : 'Testni yakunlash'}
+        </h3>
         {unanswered > 0 ? (
           <p className="text-slate-600 mb-4">
             <span className="font-semibold text-amber-600">{unanswered} ta savol</span> hali javoblanmagan.
-            Shunga qaramay testni yakunlamoqchimisiz?
+            {moduleMode ? ' Keyingi modulga o‘tmoqchimisiz?' : ' Shunga qaramay testni yakunlamoqchimisiz?'}
           </p>
         ) : (
           <p className="text-slate-600 mb-4">
-            Barcha savollar javoblandi. Testni yakunlashni tasdiqlaysizmi?
+            {moduleMode
+              ? 'Modul javoblari yakunlanadi. Keyingi modulga o‘tishni tasdiqlaysizmi?'
+              : 'Barcha savollar javoblandi. Testni yakunlashni tasdiqlaysizmi?'}
           </p>
         )}
         <div className="flex gap-3">
@@ -257,7 +295,7 @@ function ConfirmModal({ unanswered, onConfirm, onCancel, submitting = false }) {
           >
             <span className="inline-flex items-center gap-2">
               {submitting && <ButtonSpinner />}
-              {submitting ? 'Yuborilmoqda...' : 'Ha, yakunlash'}
+              {submitting ? 'Yuborilmoqda...' : moduleMode ? 'Moduldan davom etish' : 'Ha, yakunlash'}
             </span>
           </button>
           <button
@@ -360,6 +398,7 @@ export default function TestSession() {
   const [nowTs, setNowTs] = useState(() => Date.now())
   const [currentIdx, setCurrentIdx] = useState(0)
   const [showConfirm, setShowConfirm] = useState(false)
+  const [confirmingModule, setConfirmingModule] = useState(false)
   const [autoSubmitting, setAutoSubmitting] = useState(false)
   const [startSubmitting, setStartSubmitting] = useState(false)
   const [submitLoading, setSubmitLoading] = useState(false)
@@ -386,11 +425,9 @@ export default function TestSession() {
 
   const requiresManualReview = useMemo(() => {
     if (!test) return false
-    return (
-      ['rasch', 'irt'].includes(test.testData.scoringType) ||
-      test.questions.some(q => q.type === 'essay' || q.type === 'short-answer')
-    )
+    return test.questions.some(q => q.type === 'essay' || q.type === 'short-answer')
   }, [test])
+  const usesBatchScoring = ['rasch', 'irt'].includes(test?.testData?.scoringType)
 
   // ── Global clock (1s) ──
   useEffect(() => {
@@ -518,7 +555,7 @@ export default function TestSession() {
       }
     })
 
-    const status = requiresManualReview ? 'pending_review' : 'completed'
+    const status = requiresManualReview || usesBatchScoring ? 'pending_review' : 'completed'
     const attemptValue = attemptsEnabled
       ? String(participantValues.phone || '').trim()
       : String(participantValues.fullName || '').trim()
@@ -553,12 +590,16 @@ export default function TestSession() {
       return
     }
     // Mark session as done
-    try { sessionStorage.removeItem(sessionKey) } catch { }
+    try {
+      sessionStorage.removeItem(sessionKey)
+    } catch (error) {
+      console.warn('Could not clear submitted test session', error)
+    }
     setSubmitted(saved || submission)
     setShowConfirm(false)
     setSubmitLoading(false)
     setAutoSubmitting(false)
-  }, [test, answers, participantValues, requiresManualReview, sessionKey, attemptsEnabled])
+  }, [test, answers, participantValues, requiresManualReview, usesBatchScoring, sessionKey, attemptsEnabled])
 
   useEffect(() => {
     if (!started || submitted || !durationEndTs) return
@@ -575,20 +616,7 @@ export default function TestSession() {
 
     if (breakEndTs) {
       if (breakEndTs <= nowTs) {
-        let nextIndex = currentModuleIndex + 1
-        const previous = modules[currentModuleIndex]
-        if (previous?.routing === 'adaptive') {
-          const previousQuestions = shuffledQuestions.filter(({ item }) => item.moduleId === previous.id)
-          const answeredCorrectly = previousQuestions.filter(({ item }) => {
-            const answer = answers[item.id]
-            if (item.type === 'multiple-choice' || item.type === 'true-false') return String(answer) === String(item.correctAnswer)
-            return isQuestionAnswered(item, answer)
-          }).length
-          const ratio = previousQuestions.length ? answeredCorrectly / previousQuestions.length : 0
-          const targetDifficulty = ratio >= 0.75 ? 'hard' : 'easy'
-          const routedIndex = modules.findIndex((module, index) => index > currentModuleIndex && module.difficulty === targetDifficulty)
-          if (routedIndex >= 0) nextIndex = routedIndex
-        }
+        const nextIndex = getNextModuleIndex(modules, currentModuleIndex, shuffledQuestions, answers)
         setBreakEndTs(null)
         setCurrentIdx(0)
         if (nextIndex < modules.length) {
@@ -609,19 +637,7 @@ export default function TestSession() {
         setModuleEndTs(null)
         setBreakEndTs(Date.now() + breakMinutes * 60 * 1000)
       } else {
-        let nextIndex = currentModuleIndex + 1
-        const previous = modules[currentModuleIndex]
-        if (previous?.routing === 'adaptive') {
-          const previousQuestions = shuffledQuestions.filter(({ item }) => item.moduleId === previous.id)
-          const answeredCorrectly = previousQuestions.filter(({ item }) => {
-            const answer = answers[item.id]
-            return String(answer) === String(item.correctAnswer)
-          }).length
-          const ratio = previousQuestions.length ? answeredCorrectly / previousQuestions.length : 0
-          const targetDifficulty = ratio >= 0.75 ? 'hard' : 'easy'
-          const routedIndex = modules.findIndex((module, index) => index > currentModuleIndex && module.difficulty === targetDifficulty)
-          if (routedIndex >= 0) nextIndex = routedIndex
-        }
+        const nextIndex = getNextModuleIndex(modules, currentModuleIndex, shuffledQuestions, answers)
         setCurrentIdx(0)
         if (nextIndex < modules.length) {
           setCurrentModuleIndex(nextIndex)
@@ -632,7 +648,7 @@ export default function TestSession() {
         }
       }
     }
-  }, [started, submitted, modules, breakEndTs, moduleEndTs, currentModuleIndex, nowTs])
+  }, [started, submitted, modules, breakEndTs, moduleEndTs, currentModuleIndex, nowTs, shuffledQuestions, answers])
 
   useEffect(() => {
     if (!started || submitted) return
@@ -729,7 +745,35 @@ export default function TestSession() {
 
   const handleSubmitClick = () => {
     if (submitLoading) return
+    setConfirmingModule(false)
     setShowConfirm(true)
+  }
+
+  const handleModuleSubmitClick = () => {
+    if (submitLoading) return
+    setConfirmingModule(true)
+    setShowConfirm(true)
+  }
+
+  const handleFinishModule = () => {
+    const nextIndex = getNextModuleIndex(modules, currentModuleIndex, shuffledQuestions, answers)
+    if (nextIndex >= modules.length) {
+      setConfirmingModule(false)
+      return doSubmit(answers)
+    }
+
+    const breakMinutes = Number(currentModule?.breakAfterMinutes || 0)
+    setCurrentIdx(0)
+    if (breakMinutes > 0) {
+      setModuleEndTs(null)
+      setBreakEndTs(Date.now() + breakMinutes * 60 * 1000)
+    } else {
+      setCurrentModuleIndex(nextIndex)
+      const minutes = Number(modules[nextIndex]?.durationMinutes || 32)
+      setModuleEndTs(Date.now() + minutes * 60 * 1000)
+    }
+    setConfirmingModule(false)
+    setShowConfirm(false)
   }
 
   const unansweredCount = useMemo(() => {
@@ -741,6 +785,7 @@ export default function TestSession() {
   }, [activeShuffledQuestions, answers])
 
   const answeredCount = (activeShuffledQuestions.length || 0) - unansweredCount
+  const hasNextModule = modules.length > 0 && currentModuleIndex < modules.length - 1
 
   // ── Not found ──
   if (loading) {
@@ -847,7 +892,7 @@ export default function TestSession() {
           </div>
           {['rasch', 'irt'].includes(test.testData.scoringType) && (
             <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
-              ⚡ Rasch/IRT tanlangan: natijalar real time chiqarilmaydi, admin tekshiruvdan keyin e'lon qilinadi.
+              ⚡ {test.testData.scoringType === 'rasch' ? 'Rasch' : 'IRT'} balli test oynasi yakunlangach avtomatik hisoblanadi. Admin tekshiruvi talab qilinmaydi.
             </div>
           )}
         </div>
@@ -939,7 +984,9 @@ export default function TestSession() {
           <div className="space-y-4">
             {currentModule && (
               <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
-                <span className="text-sm font-semibold text-slate-700">{currentModule.title}</span>
+                <span className="text-sm font-semibold text-slate-700">
+                  Modul {currentModuleIndex + 1}/{modules.length}: {currentModule.title}
+                </span>
                 {moduleEndTs && (
                   <span className="font-mono text-sm font-bold text-slate-800">{formatCountdown(moduleEndTs - nowTs)}</span>
                 )}
@@ -1167,13 +1214,15 @@ export default function TestSession() {
                     ) : (
                       <button
                         type="button"
-                        onClick={handleSubmitClick}
+                        onClick={hasNextModule ? handleModuleSubmitClick : handleSubmitClick}
                         disabled={submitLoading}
                         className="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 transition disabled:cursor-not-allowed disabled:opacity-70"
                       >
                         <span className="inline-flex items-center gap-2">
                           {submitLoading && <ButtonSpinner className="h-3.5 w-3.5" />}
-                          {submitLoading ? 'Yuborilmoqda...' : 'Yakunlash ✓'}
+                          {submitLoading
+                            ? 'Yuborilmoqda...'
+                            : hasNextModule ? 'Modulni yakunlash →' : 'Testni yakunlash ✓'}
                         </span>
                       </button>
                     )}
@@ -1191,13 +1240,15 @@ export default function TestSession() {
               </span>
               <button
                 type="button"
-                onClick={handleSubmitClick}
+                onClick={hasNextModule ? handleModuleSubmitClick : handleSubmitClick}
                 disabled={submitLoading}
                 className="px-5 py-2.5 bg-emerald-600 text-white font-semibold rounded-xl hover:bg-emerald-700 active:scale-95 transition-all text-sm disabled:cursor-not-allowed disabled:opacity-70"
               >
                 <span className="inline-flex items-center gap-2">
                   {submitLoading && <ButtonSpinner />}
-                  {submitLoading ? 'Yuborilmoqda...' : 'Testni Yakunlash'}
+                  {submitLoading
+                    ? 'Yuborilmoqda...'
+                    : hasNextModule ? 'Modulni yakunlash va davom etish' : 'Testni yakunlash'}
                 </span>
               </button>
             </div>
@@ -1228,7 +1279,9 @@ export default function TestSession() {
               </>
             ) : (
               <p className="text-amber-700 bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6 text-sm">
-                📋 Javoblar qabul qilindi. Natija hozircha chiqarilmaydi — admin tekshiruvdan keyin yakuniy baho beriladi.
+                {usesBatchScoring
+                  ? '📋 Javoblar qabul qilindi. Yakuniy IRT/Rasch bahosi test oynasi tugagach avtomatik hisoblanadi; admin tasdig‘i talab qilinmaydi.'
+                  : '📋 Javoblar qabul qilindi. Yozma javoblar admin tomonidan tekshirilgach yakuniy baho beriladi.'}
               </p>
             )}
             <Link
@@ -1246,9 +1299,13 @@ export default function TestSession() {
       {showConfirm && (
         <ConfirmModal
           unanswered={unansweredCount}
-          onConfirm={() => doSubmit(answers)}
-          onCancel={() => setShowConfirm(false)}
+          onConfirm={() => (confirmingModule ? handleFinishModule() : doSubmit(answers))}
+          onCancel={() => {
+            setShowConfirm(false)
+            setConfirmingModule(false)
+          }}
           submitting={submitLoading}
+          moduleMode={confirmingModule}
         />
       )}
     </div>

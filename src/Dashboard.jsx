@@ -213,6 +213,7 @@ export default function Dashboard() {
             <div className="divide-y divide-slate-200">
               {testsWithStats.map((test) => {
                 const shareLink = getPublicTestUrl(test.id)
+                const usesBatchScoring = ['rasch', 'irt'].includes(test.testData.scoringType)
                 return (
                   <div
                     key={test.id}
@@ -224,7 +225,9 @@ export default function Dashboard() {
                         <span>Sana: {formatDate(test.createdAt)}</span>
                         <span>Savollar: {test.questions.length}</span>
                         <span>Javoblar: {test.submissionsCount}</span>
-                        <span>Kutilayotgan review: {test.pendingCount}</span>
+                        <span>
+                          {usesBatchScoring ? 'Avtomatik hisoblanmoqda' : 'Qo‘lda baholash kutilmoqda'}: {test.pendingCount}
+                        </span>
                       </div>
                       <p className="mt-2 text-xs text-slate-500 break-all">Link: {shareLink}</p>
                     </div>
@@ -254,7 +257,7 @@ export default function Dashboard() {
                         to={`/test/${test.id}/review`}
                         className="px-3 py-1 text-emerald-700 hover:bg-emerald-50 rounded transition text-sm font-medium"
                       >
-                        Javoblarni Baholash
+                        {usesBatchScoring ? 'Hisoblash holati' : 'Javoblarni Baholash'}
                       </Link>
                       <Link
                         to={`/edit-test/${test.id}`}

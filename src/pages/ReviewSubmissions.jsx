@@ -28,6 +28,7 @@ export default function ReviewSubmissions() {
   const isCreatorMode = sessionStorage.getItem('nexo_creator_mode') === '1'
   const creatorPlan = getPlanForTest(test || {})
   const isPro = creatorPlan === PLAN_PRO
+  const usesBatchScoring = ['rasch', 'irt'].includes(test?.testData?.scoringType)
 
   const [refreshTick, setRefreshTick] = useState(0)
   const [finalizingSubmissionId, setFinalizingSubmissionId] = useState(null)
@@ -209,7 +210,9 @@ export default function ReviewSubmissions() {
         <div className="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center">
           <div>
             <h1 className="text-2xl font-bold text-blue-600">Nexo</h1>
-            <p className="text-sm text-slate-600">Yozma javoblarni baholash</p>
+            <p className="text-sm text-slate-600">
+              {usesBatchScoring ? 'IRT/Rasch natijalarini ko‘rish' : 'Yozma javoblarni baholash'}
+            </p>
           </div>
           <Link to="/dashboard" className="px-4 py-2 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-100">Dashboard</Link>
         </div>
@@ -218,11 +221,17 @@ export default function ReviewSubmissions() {
       <main className="max-w-6xl mx-auto px-6 py-10">
         <div className="bg-white border border-slate-200 rounded-xl p-6 mb-6">
           <h2 className="text-2xl font-bold text-slate-800">{test.testData.title}</h2>
-          <p className="text-slate-600 mt-2">Baholash turi: {test.testData.scoringType === 'rasch' ? 'Rasch Model' : 'Klassik'}</p>
-          {test.testData.scoringType === 'rasch' && (
-            <p className="text-sm text-amber-700 mt-2">Rasch bo'lgani uchun yakuniy ball cohort bo'yicha avtomatik kalibrlanadi va qo'lda override qilinmaydi.</p>
+          <p className="text-slate-600 mt-2">
+            Baholash turi: {test.testData.scoringType === 'rasch'
+              ? 'Rasch Model'
+              : test.testData.scoringType === 'irt' ? 'IRT 2PL / Adaptive SAT' : 'Klassik'}
+          </p>
+          {usesBatchScoring && (
+            <p className="text-sm text-amber-700 mt-2">
+              Yakuniy model ballari test oynasi tugagach avtomatik hisoblanadi. Admin tekshirishi yoki qo‘lda yakunlashi shart emas.
+            </p>
           )}
-          {!isPro && (
+          {!isPro && !usesBatchScoring && (
             <p className="text-sm text-amber-700 mt-2">
               Free plan: faqat oxirgi {FREE_LIMITS.manualReviewRecent} ta submission uchun manual review ochiq, finalize Pro'da.
             </p>
@@ -247,7 +256,11 @@ export default function ReviewSubmissions() {
                   <h3 className="font-semibold text-slate-800">
                     {submission.participant?.fullName || 'Ismsiz participant'} ({getParticipantSecondary(submission.participant)})
                   </h3>
-                  <p className="text-sm text-slate-600">Holat: {submission.status === 'completed' ? 'Baholangan' : 'Tekshirilmoqda'}</p>
+                  <p className="text-sm text-slate-600">
+                    Holat: {submission.status === 'completed'
+                      ? 'Baholangan'
+                      : usesBatchScoring ? 'Test yakunida avtomatik hisoblanadi' : 'Qo‘lda tekshirilmoqda'}
+                  </p>
                 </div>
                 <div className="text-sm text-slate-700">Auto: {submission.autoScore} / {submission.autoMaxScore}</div>
               </div>
@@ -305,19 +318,21 @@ export default function ReviewSubmissions() {
 
               <div className="mt-4 flex items-center justify-between">
                 <span className="text-sm text-slate-700">Yakuniy ball: {submission.finalScore ?? '-'}</span>
-                <button
-                  type="button"
-                  onClick={() => finalizeCurrentSubmission(submission)}
-                  disabled={!isPro || finalizingSubmissionId === submission.id}
-                  className={`px-4 py-2 rounded-lg ${isPro ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-slate-200 text-slate-500 cursor-not-allowed'} disabled:cursor-not-allowed disabled:opacity-70`}
-                >
-                  {isPro ? (
-                    <span className="inline-flex items-center gap-2">
-                      {finalizingSubmissionId === submission.id && <ButtonSpinner className="h-3.5 w-3.5" />}
-                      {finalizingSubmissionId === submission.id ? 'Saqlanmoqda...' : 'Saqlash va Yakunlash'}
-                    </span>
-                  ) : 'Pro talab qilinadi'}
-                </button>
+                {!usesBatchScoring && (
+                  <button
+                    type="button"
+                    onClick={() => finalizeCurrentSubmission(submission)}
+                    disabled={!isPro || finalizingSubmissionId === submission.id}
+                    className={`px-4 py-2 rounded-lg ${isPro ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-slate-200 text-slate-500 cursor-not-allowed'} disabled:cursor-not-allowed disabled:opacity-70`}
+                  >
+                    {isPro ? (
+                      <span className="inline-flex items-center gap-2">
+                        {finalizingSubmissionId === submission.id && <ButtonSpinner className="h-3.5 w-3.5" />}
+                        {finalizingSubmissionId === submission.id ? 'Saqlanmoqda...' : 'Saqlash va Yakunlash'}
+                      </span>
+                    ) : 'Pro talab qilinadi'}
+                  </button>
+                )}
               </div>
             </div>
           ))}
