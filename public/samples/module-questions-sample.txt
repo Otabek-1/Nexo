@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "questions": [
+    {
+      "type": "multiple-choice",
+      "content": "<p>Solve for x: 2x + 3 = 11.</p>",
+      "options": ["2", "3", "4", "5"],
+      "correctAnswer": 2,
+      "difficulty": -0.2,
+      "discrimination": 1.1,
+      "guessing": 0.25
+    },
+    {
+      "type": "sat-math-input",
+      "content": "<p>What is 1 divided by 3? Enter one accepted form.</p>",
+      "correctAnswer": "0.3, 0.33, 0.333, 1/3",
+      "difficulty": 0.4,
+      "discrimination": 1,
+      "guessing": 0
+    },
+    {
+      "type": "two-part-math",
+      "content": "<p>Use the expression x + 2.</p>",
+      "subQuestions": ["Evaluate the expression when x = 3.", "Solve x + 2 = 7."],
+      "twoPartCorrectAnswers": ["5", "5"],
+      "twoPartPoints": [1, 1],
+      "difficulty": 0,
+      "discrimination": 1,
+      "guessing": 0
+    },
+    {
+      "type": "true-false",
+      "content": "<p>The square root of 49 is 7.</p>",
+      "correctAnswer": "true",
+      "difficulty": -0.5,
+      "discrimination": 1,
+      "guessing": 0
+    }
+  ]
+}

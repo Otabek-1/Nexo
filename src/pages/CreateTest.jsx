@@ -8,6 +8,7 @@ import RichTextEditor from '../components/RichTextEditor'
 import ButtonSpinner from '../components/ButtonSpinner'
 import { isRichContentEmpty } from '../lib/richContent'
 import { normalizeCellAnswerText, tokenizeIntoCells } from '../lib/cellAnswer'
+import { parseModuleQuestionFile } from '../lib/questionImport'
 
 const toDateTimeLocal = (value) => {
   if (!value) return ''
@@ -108,9 +109,25 @@ export default function CreateTest() {
   const [newParticipantType, setNewParticipantType] = useState('text')
   const [currentQuestion, setCurrentQuestion] = useState(emptyQuestion)
   const [editingQuestionId, setEditingQuestionId] = useState(null)
+  const [importModuleId, setImportModuleId] = useState('')
+  const [importFile, setImportFile] = useState(null)
+  const [importNotice, setImportNotice] = useState('')
   const [createdTest, setCreatedTest] = useState(null)
   const [telegramRegistrationLink, setTelegramRegistrationLink] = useState('')
   const [saveLoading, setSaveLoading] = useState(false)
+
+  useEffect(() => {
+    setTestData(prev => {
+      let changed = false
+      const modules = prev.modules.map(module => {
+        const questionCount = questions.filter(question => question.moduleId === module.id).length
+        if (module.questionCount === questionCount) return module
+        changed = true
+        return { ...module, questionCount }
+      })
+      return changed ? { ...prev, modules } : prev
+    })
+  }, [questions])
 
   const shareLink = useMemo(() => {
     if (!createdTest) return ''
@@ -205,7 +222,7 @@ export default function CreateTest() {
           difficulty: 'medium',
           durationMinutes: 32,
           breakAfterMinutes: 10,
-          questionCount: 27,
+          questionCount: 0,
           routing: 'none'
         }
       ]
@@ -234,6 +251,48 @@ export default function CreateTest() {
       ...prev,
       [name]: value
     }))
+  }
+
+  const handleImportQuestions = async () => {
+    if (!importFile) {
+      alert('Avval savollar faylini tanlang')
+      return
+    }
+
+    const targetModuleId = testData.modules.some(module => module.id === importModuleId)
+      ? importModuleId
+      : testData.modules[0]?.id
+    if (!targetModuleId) {
+      alert("Savollarni import qilishdan oldin kamida bitta modul qo'shing")
+      return
+    }
+
+    try {
+      const importedQuestions = parseModuleQuestionFile(await importFile.text(), {
+        moduleId: targetModuleId,
+        scoringType: testData.scoringType
+      })
+      if (!isPro && questions.length + importedQuestions.length > FREE_LIMITS.questionsPerTest) {
+        alert(`Free plan uchun har testda ${FREE_LIMITS.questionsPerTest} ta savol limiti bor. Import qilinmadi.`)
+        return
+      }
+
+      setQuestions(prev => [...prev, ...importedQuestions])
+      const moduleQuestionCount = questions.filter(question => question.moduleId === targetModuleId).length
+        + importedQuestions.length
+      setTestData(prev => ({
+        ...prev,
+        modules: prev.modules.map(module => module.id === targetModuleId
+          ? { ...module, questionCount: moduleQuestionCount }
+          : module)
+      }))
+      const targetModule = testData.modules.find(module => module.id === targetModuleId)
+      setImportNotice(`${importedQuestions.length} ta savol "${targetModule?.title || 'modul'}" moduliga import qilindi. O'zgarishlar hozircha faqat editorda.`)
+      setImportFile(null)
+      setImportModuleId(targetModuleId)
+    } catch (error) {
+      alert(error?.message || 'Fayldagi savollarni import qilib bo‘lmadi')
+    }
   }
 
   const addParticipantField = () => {
@@ -1023,7 +1082,7 @@ export default function CreateTest() {
                         Oxirgi moduldan keyingi tanaffus hisobga olinmaydi.
                       </p>
                       {testData.modules.map((module, index) => (
-                        <div key={module.id} className="grid grid-cols-2 md:grid-cols-7 gap-2 rounded-lg border border-slate-200 p-3">
+                        <div key={module.id} className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-2 rounded-lg border border-slate-200 p-3">
                           <input
                             value={module.title}
                             onChange={(e) => updateModule(module.id, 'title', e.target.value)}
@@ -1046,6 +1105,9 @@ export default function CreateTest() {
                             <option value="none">Odatiy</option>
                             <option value="adaptive">Adaptive</option>
                           </select>
+                          <span className="flex items-center px-2 text-xs text-slate-600">
+                            Savollar: {questions.filter(question => question.moduleId === module.id).length}
+                          </span>
                           <button type="button" onClick={() => removeModule(module.id)} className="px-2 py-1.5 text-xs font-semibold rounded-md text-red-600 hover:bg-red-50">O'chirish</button>
                         </div>
                       ))}
@@ -1098,6 +1160,57 @@ export default function CreateTest() {
               <h2 className="text-3xl font-bold text-slate-800">Savollarni Qoshish</h2>
               <p className="text-slate-600 mt-2">{testData.title}</p>
             </div>
+
+            {testData.modules.length > 0 && (
+              <div className="mb-8 rounded-lg border border-indigo-200 bg-indigo-50 p-6">
+                <h3 className="text-lg font-bold text-indigo-950">Modul savollarini fayldan import qilish</h3>
+                <p className="mt-1 text-sm text-indigo-900">
+                  Bitta TXT fayl ichida JSON formatida modul savollarini tayyorlang. Import qilingan savollar quyidagi ro'yxatga qo'shiladi; yakuniy tugmani bosmaguningizcha testga saqlanmaydi yoki publish qilinmaydi.
+                </p>
+                <div className="mt-4 grid gap-3 md:grid-cols-[1fr_2fr_auto] md:items-end">
+                  <div>
+                    <label htmlFor="importModuleId" className="mb-1 block text-xs font-medium text-indigo-950">Maqsad modul</label>
+                    <select
+                      id="importModuleId"
+                      value={testData.modules.some(module => module.id === importModuleId) ? importModuleId : (testData.modules[0]?.id || '')}
+                      onChange={(event) => setImportModuleId(event.target.value)}
+                      className="w-full rounded-lg border border-indigo-200 bg-white px-3 py-2 text-sm"
+                    >
+                      {testData.modules.map(module => <option key={module.id} value={module.id}>{module.title}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="moduleQuestionsFile" className="mb-1 block text-xs font-medium text-indigo-950">Savollar fayli (.txt)</label>
+                    <input
+                      id="moduleQuestionsFile"
+                      type="file"
+                      accept=".txt,.json,text/plain,application/json"
+                      onChange={(event) => setImportFile(event.target.files?.[0] || null)}
+                      className="w-full rounded-lg border border-indigo-200 bg-white px-3 py-1.5 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-indigo-100 file:px-3 file:py-1 file:text-indigo-800"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleImportQuestions}
+                    disabled={!importFile}
+                    className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Import qilish
+                  </button>
+                </div>
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-indigo-900">
+                  <span>{importFile?.name || 'Fayl tanlanmagan'}</span>
+                  <a
+                    href="/samples/module-questions-sample.txt"
+                    download
+                    className="font-semibold underline underline-offset-2"
+                  >
+                    Namuna TXT faylini yuklab olish
+                  </a>
+                </div>
+                {importNotice && <p className="mt-3 rounded-md bg-white/70 px-3 py-2 text-sm text-emerald-800">{importNotice}</p>}
+              </div>
+            )}
 
             <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-8 mb-8 space-y-6">
               {editingQuestionId && (
