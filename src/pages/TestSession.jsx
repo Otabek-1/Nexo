@@ -15,6 +15,7 @@ import {
 
 const TWO_PART_WRITTEN_TYPE = 'two-part-written'
 const TWO_PART_MATH_TYPE = 'two-part-math'
+const SAT_MATH_INPUT_TYPE = 'sat-math-input'
 const isTwoPartType = (value) => value === TWO_PART_WRITTEN_TYPE || value === TWO_PART_MATH_TYPE
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -27,6 +28,7 @@ const getQuestionMaxScore = (question, scoringType) => {
   if (
     question.type === 'multiple-choice' ||
     question.type === 'true-false' ||
+    question.type === SAT_MATH_INPUT_TYPE ||
     isTwoPartType(question.type)
   ) return 1
   return 0
@@ -971,6 +973,7 @@ export default function TestSession() {
                           question.type === 'true-false' ? "To'g'ri/Noto'g'ri" :
                             question.type === TWO_PART_WRITTEN_TYPE ? '2 qismli yozma' :
                             question.type === TWO_PART_MATH_TYPE ? '2 qismli matematik' :
+                            question.type === SAT_MATH_INPUT_TYPE ? 'SAT Math — javobni yozish' :
                             question.type === 'essay' ? 'Yozma javob' : 'Qisqa javob'}
                       </span>
                     </div>
@@ -1052,6 +1055,20 @@ export default function TestSession() {
                       className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm resize-none"
                       placeholder={question.type === 'essay' ? 'Batafsil javobingizni yozing...' : 'Qisqa javob...'}
                     />
+                  )}
+
+                  {question.type === SAT_MATH_INPUT_TYPE && (
+                    <div className="space-y-2">
+                      <p className="text-xs text-slate-500">Javobni kasr yoki o'nli son ko'rinishida, 5 ta belgigacha kiriting.</p>
+                      <input
+                        type="text"
+                        maxLength={5}
+                        value={answers[question.id] ?? ''}
+                        onChange={(e) => handleAnswerChange(question.id, e.target.value)}
+                        placeholder="Masalan: 1/3"
+                        className="w-full max-w-xs px-4 py-3 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 text-sm"
+                      />
+                    </div>
                   )}
 
                   {question.type === TWO_PART_WRITTEN_TYPE && (

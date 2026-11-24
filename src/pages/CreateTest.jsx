@@ -55,6 +55,7 @@ const getModulesDuration = (modules) => {
 export default function CreateTest() {
   const TWO_PART_WRITTEN_TYPE = 'two-part-written'
   const TWO_PART_MATH_TYPE = 'two-part-math'
+  const SAT_MATH_INPUT_TYPE = 'sat-math-input'
   const isTwoPartType = (value) => value === TWO_PART_WRITTEN_TYPE || value === TWO_PART_MATH_TYPE
   const navigate = useNavigate()
   const { id } = useParams()
@@ -350,6 +351,12 @@ export default function CreateTest() {
         normalized.twoPartPoints = ['1', '1']
       }
     }
+    if (normalized.type === SAT_MATH_INPUT_TYPE) {
+      normalized.correctAnswer = String(normalized.correctAnswer || '')
+        .split(',')
+        .map(answer => answer.trim())
+        .join(', ')
+    }
 
     return normalized
   }
@@ -387,6 +394,21 @@ export default function CreateTest() {
     if (currentQuestion.type === 'true-false' && !['true', 'false'].includes(currentQuestion.correctAnswer)) {
       alert('True/False savolda togri javobni tanlang')
       return
+    }
+
+    if (currentQuestion.type === SAT_MATH_INPUT_TYPE) {
+      const acceptedAnswers = String(currentQuestion.correctAnswer || '').split(',').map(answer => answer.trim())
+      const validAnswer = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+|\d+\/\d+)$/
+      if (
+        acceptedAnswers.length === 0 ||
+        acceptedAnswers.some(answer => {
+          const compact = answer.replace(/\s+/g, '')
+          return !compact || compact.length > 5 || !validAnswer.test(compact)
+        })
+      ) {
+        alert("To'g'ri javob variantlarini vergul bilan ajrating. Har biri 5 ta belgigacha bo'lgan son yoki kasr bo'lsin (masalan: 0.3, 0.33, 0.333, 1/3).")
+        return
+      }
     }
 
     if (currentQuestion.type === 'essay') {
@@ -1099,6 +1121,7 @@ export default function CreateTest() {
                   <option value={TWO_PART_WRITTEN_TYPE}>2 qismli yozma (a,b)</option>
                   <option value={TWO_PART_MATH_TYPE}>2 qismli matematik (a,b)</option>
                   <option value="multiple-choice">Kop Variantli</option>
+                  {testData.scoringType === 'irt' && <option value={SAT_MATH_INPUT_TYPE}>SAT Math — javobni yozish</option>}
                   {!['rasch', 'irt'].includes(testData.scoringType) && <option value="essay">Yozma Javob (Essay)</option>}
                   <option value="true-false">Togri/Notogri</option>
                 </select>
@@ -1285,6 +1308,26 @@ export default function CreateTest() {
                 </div>
               )}
 
+              {currentQuestion.type === SAT_MATH_INPUT_TYPE && (
+                <div>
+                  <label htmlFor="satMathAcceptedAnswers" className="block text-sm font-medium text-slate-700 mb-2">
+                    Qabul qilinadigan to'g'ri javoblar *
+                  </label>
+                  <input
+                    type="text"
+                    id="satMathAcceptedAnswers"
+                    name="correctAnswer"
+                    value={currentQuestion.correctAnswer}
+                    onChange={handleQuestionChange}
+                    placeholder="0.3, 0.33, 0.333, 1/3"
+                    className="w-full px-4 py-2 border border-emerald-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                  <p className="mt-2 text-xs text-slate-500">
+                    Vergul bilan ajrating. Har bir javob 5 ta belgigacha; kasr va o'nli ko'rinishlarni alohida kiriting.
+                  </p>
+                </div>
+              )}
+
               {currentQuestion.type === 'essay' && !['rasch', 'irt'].includes(testData.scoringType) && (
                 <div>
                   <label htmlFor="points" className="block text-sm font-medium text-slate-700 mb-2">
@@ -1344,6 +1387,7 @@ export default function CreateTest() {
                               {q.type === 'short-answer' ? 'Qisqa Javob' :
                                 q.type === TWO_PART_WRITTEN_TYPE ? '2 qismli yozma' :
                                 q.type === TWO_PART_MATH_TYPE ? '2 qismli matematik' :
+                                q.type === SAT_MATH_INPUT_TYPE ? 'SAT Math — javobni yozish' :
                                 q.type === 'multiple-choice' ? 'Kop Variantli' :
                                   q.type === 'essay' ? 'Yozma Javob' :
                                     'Togri/Notogri'}
@@ -1360,6 +1404,9 @@ export default function CreateTest() {
                               <span>
                                 Togri javob: {q.correctAnswer === 'true' ? 'Togri' : 'Notogri'}
                               </span>
+                            )}
+                            {q.type === SAT_MATH_INPUT_TYPE && (
+                              <span>Qabul qilinadi: {q.correctAnswer}</span>
                             )}
                             {isTwoPartType(q.type) && (
                               <span>

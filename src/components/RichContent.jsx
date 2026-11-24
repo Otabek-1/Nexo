@@ -3,10 +3,73 @@ import katex from 'katex'
 import 'katex/dist/katex.min.css'
 import { sanitizeRichContent } from '../lib/richContent'
 
+const PLAIN_MATH_EXPRESSION_PATTERN = new RegExp('^[\\s\\dA-Za-z\\\\{}()[\\]^_+=*/.,<>|:-]+$')
+
 // ─── KaTeX render ─────────────────────────────────────────────────────────────
 
 const renderLatex = (container, katex) => {
   if (!katex || !container) return
+  const delimiterPattern = /\$\$([\s\S]+?)\$\$|\\\[([\s\S]+?)\\\]|\\\(([\s\S]+?)\\\)|\$([^$\n]+?)\$/g
+  const isPlainMathExpression = (value) => {
+    const expression = value.trim()
+    if (!expression || !/[\^_*/=+\-\\]/.test(expression)) return false
+    if (!PLAIN_MATH_EXPRESSION_PATTERN.test(expression)) return false
+    const words = expression.match(/[A-Za-z]{3,}/g) || []
+    return words.every((word) => [
+      'sin', 'cos', 'tan', 'cot', 'log', 'ln', 'sqrt', 'pi',
+      'frac', 'dfrac', 'left', 'right', 'cdot', 'times', 'div', 'infty',
+    ].includes(word))
+  }
+  const shouldSkipTextNode = (node) => {
+    let parent = node.parentElement
+    while (parent && parent !== container) {
+      if (['CODE', 'PRE', 'SCRIPT', 'STYLE', 'TEXTAREA'].includes(parent.tagName) || parent.hasAttribute('data-latex')) {
+        return true
+      }
+      parent = parent.parentElement
+    }
+    return false
+  }
+
+  const textNodes = document.createTreeWalker(container, NodeFilter.SHOW_TEXT)
+  const nodesToConvert = []
+  while (textNodes.nextNode()) {
+    const node = textNodes.currentNode
+    if (!shouldSkipTextNode(node) && (delimiterPattern.test(node.nodeValue) || isPlainMathExpression(node.nodeValue))) {
+      nodesToConvert.push(node)
+    }
+    delimiterPattern.lastIndex = 0
+  }
+
+  nodesToConvert.forEach((node) => {
+    const text = node.nodeValue
+    const fragment = document.createDocumentFragment()
+    let cursor = 0
+    let hasMatch = false
+    delimiterPattern.lastIndex = 0
+    let match
+    while ((match = delimiterPattern.exec(text))) {
+      hasMatch = true
+      fragment.append(document.createTextNode(text.slice(cursor, match.index)))
+      const latex = match[1] ?? match[2] ?? match[3] ?? match[4]
+      const display = Boolean(match[1] || match[2])
+      const span = document.createElement('span')
+      span.className = display ? 'math-display' : 'math-inline'
+      span.setAttribute('data-latex', latex)
+      fragment.append(span)
+      cursor = delimiterPattern.lastIndex
+    }
+    if (hasMatch) {
+      fragment.append(document.createTextNode(text.slice(cursor)))
+      node.replaceWith(fragment)
+    } else if (isPlainMathExpression(text)) {
+      const span = document.createElement('span')
+      span.className = 'math-inline'
+      span.setAttribute('data-latex', text.trim())
+      node.replaceWith(span)
+    }
+  })
+
   container.querySelectorAll('span[data-latex]').forEach((el) => {
     // Allaqachon render qilingan bo'lsa o'tkazish
     if (el.querySelector('.katex')) return

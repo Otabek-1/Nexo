@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
 import { isRichContentEmpty, sanitizeRichContent } from '../lib/richContent'
+import RichContent from './RichContent'
 
 // ─── Math / Symbol Palettes ──────────────────────────────────────────────────
 
@@ -876,6 +877,10 @@ export default function RichTextEditor({
   }
 
   const showPlaceholder = !focus && isRichContentEmpty(normalizedValue)
+  const plainTextValue = normalizedValue.replace(/<[^>]*>/g, ' ').trim()
+  const showMathPreview = /\$\$[\s\S]+?\$\$|\\\[[\s\S]+?\\\]|\\\([\s\S]+?\\\)|\$[^$\n]+?\$/.test(plainTextValue) ||
+    plainTextValue.includes('\\') ||
+    /[A-Za-z0-9]\s*\^[\w{}()]+/.test(plainTextValue)
 
   return (
     <div className="rounded-xl border border-slate-300 overflow-hidden shadow-sm bg-white">
@@ -1032,6 +1037,13 @@ export default function RichTextEditor({
           style={{ minHeight: '200px', wordBreak: 'break-word' }}
         />
       </div>
+
+      {showMathPreview && (
+        <div className="border-t border-slate-100 bg-slate-50 px-4 py-2">
+          <p className="mb-1 text-[11px] font-medium text-slate-500">Formula ko'rinishi</p>
+          <RichContent html={normalizedValue} className="text-sm" />
+        </div>
+      )}
 
       {/* ── Status bar ── */}
       <div className="px-4 py-1.5 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
