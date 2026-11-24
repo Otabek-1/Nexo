@@ -61,7 +61,11 @@ export default function CreateTest() {
     correctAnswer: '',
     subQuestions: ['', ''],
     twoPartCorrectAnswers: ['', ''],
-    twoPartPoints: ['1', '1']
+    twoPartPoints: ['1', '1'],
+    moduleId: '',
+    difficulty: '0',
+    discrimination: '1',
+    guessing: '0'
   }
   const defaultParticipantField = {
     id: 'fullName',
@@ -82,7 +86,8 @@ export default function CreateTest() {
     attemptsCount: '1',
     registrationWindowHours: '24',
     scoringType: 'correct-incorrect',
-    testType: 'exam'
+    testType: 'exam',
+    modules: []
   })
 
   const [questions, setQuestions] = useState([])
@@ -125,7 +130,8 @@ export default function CreateTest() {
               attemptsCount: String(found?.testData?.attemptsCount || '1'),
               registrationWindowHours: String(found?.testData?.registrationWindowHours || '24'),
               scoringType: found?.testData?.scoringType || 'correct-incorrect',
-              testType: found?.testData?.testType || 'exam'
+              testType: found?.testData?.testType || 'exam',
+              modules: Array.isArray(found?.testData?.modules) ? found.testData.modules : []
             })
             setQuestions(found?.questions || [])
             const configured = Array.isArray(found?.testData?.participantFields) ? found.testData.participantFields : []
@@ -160,6 +166,41 @@ export default function CreateTest() {
     setTestData(prev => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value
+    }))
+  }
+
+  const addModule = () => {
+    setTestData(prev => ({
+      ...prev,
+      modules: [
+        ...prev.modules,
+        {
+          id: `module-${prev.modules.length + 1}`,
+          title: `Modul ${prev.modules.length + 1}`,
+          subject: 'general',
+          difficulty: 'medium',
+          durationMinutes: 32,
+          breakAfterMinutes: 10,
+          questionCount: 27,
+          routing: 'none'
+        }
+      ]
+    }))
+  }
+
+  const updateModule = (moduleId, field, value) => {
+    setTestData(prev => ({
+      ...prev,
+      modules: prev.modules.map(module => module.id === moduleId
+        ? { ...module, [field]: value }
+        : module)
+    }))
+  }
+
+  const removeModule = (moduleId) => {
+    setTestData(prev => ({
+      ...prev,
+      modules: prev.modules.filter(module => module.id !== moduleId)
     }))
   }
 
@@ -243,7 +284,11 @@ export default function CreateTest() {
   const normalizeQuestionForSave = () => {
     const normalized = {
       ...currentQuestion,
-      content: currentQuestion.content
+      content: currentQuestion.content,
+      moduleId: String(currentQuestion.moduleId || '').trim() || null,
+      difficulty: Number(currentQuestion.difficulty ?? 0),
+      discrimination: Number(currentQuestion.discrimination ?? 1),
+      guessing: Number(currentQuestion.guessing ?? 0)
     }
 
     if (normalized.type === 'multiple-choice') {
@@ -292,8 +337,8 @@ export default function CreateTest() {
       return
     }
 
-    if (testData.scoringType === 'rasch' && (currentQuestion.type === 'essay' || currentQuestion.type === 'short-answer')) {
-      alert("Haqiqiy Rasch rejimida faqat multiple-choice, true-false, 2 qismli yozma va 2 qismli matematik savollar qo'llanadi")
+    if (['rasch', 'irt'].includes(testData.scoringType) && (currentQuestion.type === 'essay' || currentQuestion.type === 'short-answer')) {
+      alert("Rasch/IRT rejimida faqat multiple-choice, true-false, 2 qismli yozma va 2 qismli matematik savollar qo'llanadi")
       return
     }
 
@@ -498,8 +543,8 @@ export default function CreateTest() {
       return
     }
     
-    if (!isPro && testData.scoringType === 'rasch') {
-      alert('Rasch scoring faqat Pro plan uchun ochiq')
+    if (!isPro && (testData.scoringType === 'rasch' || testData.scoringType === 'irt')) {
+      alert('Rasch va IRT scoring faqat Pro plan uchun ochiq')
       return
     }
 
@@ -676,7 +721,7 @@ export default function CreateTest() {
               </div>
             )}
 
-            {testData.scoringType === 'rasch' && (
+            {['rasch', 'irt'].includes(testData.scoringType) && (
               <div className="mb-6 rounded-lg border border-amber-300 bg-amber-50 p-4 text-amber-900 text-sm">
                 Diqqat: Rasch baholash tizimi tanlansa natijalar real time korinmaydi va kam sonli foydalanuvchilarda tavsiya qilinmaydi.
               </div>
@@ -901,11 +946,54 @@ export default function CreateTest() {
                   >
                     <option value="correct-incorrect">Togri/Notogri (Klassik)</option>
                     <option value="rasch" disabled={!isPro}>Rasch Model {!isPro ? '(Pro)' : ''}</option>
+                    <option value="irt" disabled={!isPro}>IRT 2PL / Adaptive SAT {!isPro ? '(Pro)' : ''}</option>
                   </select>
                   {!isPro && (
                     <p className="mt-2 text-xs text-amber-700">
-                      Rasch scoring Pro plan uchun.
+                      Rasch va IRT scoring Pro plan uchun.
                     </p>
+                  )}
+                </div>
+
+                <div className="md:col-span-2">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-sm font-medium text-slate-700">Test modullari va tanaffuslar</label>
+                    <button type="button" onClick={addModule} className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-blue-200 bg-blue-50 text-blue-700">
+                      + Modul qo'shish
+                    </button>
+                  </div>
+                  {testData.modules.length === 0 ? (
+                    <p className="text-xs text-slate-500">Modul yo'q bo'lsa test bitta umumiy sessiya sifatida ishlaydi.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {testData.modules.map((module, index) => (
+                        <div key={module.id} className="grid grid-cols-2 md:grid-cols-7 gap-2 rounded-lg border border-slate-200 p-3">
+                          <input
+                            value={module.title}
+                            onChange={(e) => updateModule(module.id, 'title', e.target.value)}
+                            className="px-2 py-1.5 border border-slate-300 rounded-md text-xs"
+                            placeholder="Modul nomi"
+                          />
+                          <select value={module.subject} onChange={(e) => updateModule(module.id, 'subject', e.target.value)} className="px-2 py-1.5 border border-slate-300 rounded-md text-xs">
+                            <option value="general">Umumiy</option>
+                            <option value="reading-writing">Reading & Writing</option>
+                            <option value="math">Math</option>
+                          </select>
+                          <select value={module.difficulty} onChange={(e) => updateModule(module.id, 'difficulty', e.target.value)} className="px-2 py-1.5 border border-slate-300 rounded-md text-xs">
+                            <option value="easy">Oson</option>
+                            <option value="medium">O'rta</option>
+                            <option value="hard">Qiyin</option>
+                          </select>
+                          <input type="number" min="1" value={module.durationMinutes} onChange={(e) => updateModule(module.id, 'durationMinutes', Number(e.target.value))} className="px-2 py-1.5 border border-slate-300 rounded-md text-xs" title="Modul vaqti (daqiqa)" />
+                          <input type="number" min="0" value={module.breakAfterMinutes} onChange={(e) => updateModule(module.id, 'breakAfterMinutes', Number(e.target.value))} className="px-2 py-1.5 border border-slate-300 rounded-md text-xs" title="Keyingi modulgacha tanaffus (daqiqa)" />
+                          <select value={module.routing} onChange={(e) => updateModule(module.id, 'routing', e.target.value)} className="px-2 py-1.5 border border-slate-300 rounded-md text-xs">
+                            <option value="none">Odatiy</option>
+                            <option value="adaptive">Adaptive</option>
+                          </select>
+                          <button type="button" onClick={() => removeModule(module.id)} className="px-2 py-1.5 text-xs font-semibold rounded-md text-red-600 hover:bg-red-50">O'chirish</button>
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </div>
 
@@ -972,14 +1060,42 @@ export default function CreateTest() {
                   onChange={handleQuestionTypeChange}
                   className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
                 >
-                  {testData.scoringType !== 'rasch' && <option value="short-answer">Qisqa Javob</option>}
+                  {!['rasch', 'irt'].includes(testData.scoringType) && <option value="short-answer">Qisqa Javob</option>}
                   <option value={TWO_PART_WRITTEN_TYPE}>2 qismli yozma (a,b)</option>
                   <option value={TWO_PART_MATH_TYPE}>2 qismli matematik (a,b)</option>
                   <option value="multiple-choice">Kop Variantli</option>
-                  {testData.scoringType !== 'rasch' && <option value="essay">Yozma Javob (Essay)</option>}
+                  {!['rasch', 'irt'].includes(testData.scoringType) && <option value="essay">Yozma Javob (Essay)</option>}
                   <option value="true-false">Togri/Notogri</option>
                 </select>
               </div>
+
+              {(testData.scoringType === 'irt' || testData.modules.length > 0) && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">Modul</label>
+                    <select value={currentQuestion.moduleId || ''} onChange={(e) => setCurrentQuestion(prev => ({ ...prev, moduleId: e.target.value }))} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm">
+                      <option value="">Modulsiz</option>
+                      {testData.modules.map(module => <option key={module.id} value={module.id}>{module.title}</option>)}
+                    </select>
+                  </div>
+                  {testData.scoringType === 'irt' && (
+                    <>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-600 mb-1">Difficulty (b)</label>
+                        <input type="number" step="0.1" value={currentQuestion.difficulty} onChange={(e) => setCurrentQuestion(prev => ({ ...prev, difficulty: e.target.value }))} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-600 mb-1">Discrimination (a)</label>
+                        <input type="number" step="0.1" min="0.1" value={currentQuestion.discrimination} onChange={(e) => setCurrentQuestion(prev => ({ ...prev, discrimination: e.target.value }))} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-600 mb-1">Guessing (c)</label>
+                        <input type="number" step="0.01" min="0" max="0.99" value={currentQuestion.guessing} onChange={(e) => setCurrentQuestion(prev => ({ ...prev, guessing: e.target.value }))} className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm" />
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
 
               <div>
                 <label htmlFor="content" className="block text-sm font-medium text-slate-700 mb-2">
@@ -1134,7 +1250,7 @@ export default function CreateTest() {
                 </div>
               )}
 
-              {currentQuestion.type === 'essay' && testData.scoringType !== 'rasch' && (
+              {currentQuestion.type === 'essay' && !['rasch', 'irt'].includes(testData.scoringType) && (
                 <div>
                   <label htmlFor="points" className="block text-sm font-medium text-slate-700 mb-2">
                     Ball *
@@ -1197,7 +1313,7 @@ export default function CreateTest() {
                                   q.type === 'essay' ? 'Yozma Javob' :
                                     'Togri/Notogri'}
                             </span>
-                            {testData.scoringType === 'rasch' || q.type === 'essay' ? (
+                            {['rasch', 'irt'].includes(testData.scoringType) || q.type === 'essay' ? (
                               <span>Ball: {q.points || 1}</span>
                             ) : null}
                             {q.type === 'multiple-choice' && (
@@ -1215,7 +1331,7 @@ export default function CreateTest() {
                                 Kichik savollar: {(q.subQuestions || []).filter(Boolean).length}/2, To'g'ri javoblar: {((q.twoPartCorrectAnswers || []).filter(Boolean).length)}/2
                               </span>
                             )}
-                            {isTwoPartType(q.type) && testData.scoringType === 'rasch' && (
+                            {isTwoPartType(q.type) && ['rasch', 'irt'].includes(testData.scoringType) && (
                               <span>
                                 Rasch ball: a) {q.twoPartPoints?.[0] || 1}, b) {q.twoPartPoints?.[1] || 1}
                               </span>

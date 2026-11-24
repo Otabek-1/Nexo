@@ -20,7 +20,7 @@ const isTwoPartType = (value) => value === TWO_PART_WRITTEN_TYPE || value === TW
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 const getQuestionMaxScore = (question, scoringType) => {
-  if (scoringType === 'rasch' || question.type === 'essay') {
+  if (['rasch', 'irt'].includes(scoringType) || question.type === 'essay') {
     const parsed = Number(question.points)
     return Number.isFinite(parsed) && parsed > 0 ? parsed : 1
   }
@@ -365,7 +365,19 @@ export default function TestSession() {
 
   // ── Shuffled questions (session davomida barqaror) ──
   const [shuffledQuestions, setShuffledQuestions] = useState([])
+  const [currentModuleIndex, setCurrentModuleIndex] = useState(0)
+  const [moduleEndTs, setModuleEndTs] = useState(null)
+  const [breakEndTs, setBreakEndTs] = useState(null)
   const attemptsEnabled = Boolean(test?.testData?.attemptsEnabled)
+  const modules = useMemo(
+    () => (Array.isArray(test?.testData?.modules) ? test.testData.modules : []),
+    [test]
+  )
+  const currentModule = modules[currentModuleIndex] || null
+  const activeShuffledQuestions = useMemo(() => {
+    if (!currentModule) return shuffledQuestions
+    return shuffledQuestions.filter(({ item }) => item.moduleId === currentModule.id)
+  }, [shuffledQuestions, currentModule])
 
   const autoSubmitRef = useRef(false)
   const sessionKey = useMemo(() => (test ? makeSessionKey(test.id) : null), [test])
@@ -373,7 +385,7 @@ export default function TestSession() {
   const requiresManualReview = useMemo(() => {
     if (!test) return false
     return (
-      test.testData.scoringType === 'rasch' ||
+      ['rasch', 'irt'].includes(test.testData.scoringType) ||
       test.questions.some(q => q.type === 'essay' || q.type === 'short-answer')
     )
   }, [test])
@@ -397,6 +409,9 @@ export default function TestSession() {
       setShuffledQuestions(session.shuffledQuestions || [])
       setDurationEndTs(session.durationEndTs || null)
       setCurrentIdx(session.currentIdx || 0)
+      setCurrentModuleIndex(session.currentModuleIndex || 0)
+      setModuleEndTs(session.moduleEndTs || null)
+      setBreakEndTs(session.breakEndTs || null)
       setStarted(true)
     } catch {
       // corrupt data — ignore
@@ -413,10 +428,13 @@ export default function TestSession() {
         shuffledQuestions,
         durationEndTs,
         currentIdx,
+        currentModuleIndex,
+        moduleEndTs,
+        breakEndTs,
         submitted: false,
       }))
     } catch { /* quota exceeded — ignore */ }
-  }, [sessionKey, started, participantValues, answers, shuffledQuestions, durationEndTs, currentIdx])
+  }, [sessionKey, started, participantValues, answers, shuffledQuestions, durationEndTs, currentIdx, currentModuleIndex, moduleEndTs, breakEndTs])
 
   // ── Test window timing (start/end times from testData) ──
   const timing = useMemo(() => {
@@ -489,7 +507,7 @@ export default function TestSession() {
           ? compareCellAnswers(parsed.second, secondCorrect)
           : String(parsed.second || '').trim() === String(secondCorrect || '').trim()
 
-        if (test.testData.scoringType === 'rasch') {
+        if (['rasch', 'irt'].includes(test.testData.scoringType)) {
           if (firstMatched) autoScore += Number.isFinite(firstPoints) && firstPoints > 0 ? firstPoints : 1
           if (secondMatched) autoScore += Number.isFinite(secondPoints) && secondPoints > 0 ? secondPoints : 1
         } else if (firstMatched && secondMatched) {
@@ -549,6 +567,70 @@ export default function TestSession() {
     const t = setTimeout(() => doSubmit(answers), 1500)
     return () => clearTimeout(t)
   }, [durationRemaining, started, submitted, durationEndTs, durationMs, doSubmit, answers])
+
+  useEffect(() => {
+    if (!started || submitted || modules.length === 0) return
+
+    if (breakEndTs) {
+      if (breakEndTs <= nowTs) {
+        let nextIndex = currentModuleIndex + 1
+        const previous = modules[currentModuleIndex]
+        if (previous?.routing === 'adaptive') {
+          const previousQuestions = shuffledQuestions.filter(({ item }) => item.moduleId === previous.id)
+          const answeredCorrectly = previousQuestions.filter(({ item }) => {
+            const answer = answers[item.id]
+            if (item.type === 'multiple-choice' || item.type === 'true-false') return String(answer) === String(item.correctAnswer)
+            return isQuestionAnswered(item, answer)
+          }).length
+          const ratio = previousQuestions.length ? answeredCorrectly / previousQuestions.length : 0
+          const targetDifficulty = ratio >= 0.75 ? 'hard' : 'easy'
+          const routedIndex = modules.findIndex((module, index) => index > currentModuleIndex && module.difficulty === targetDifficulty)
+          if (routedIndex >= 0) nextIndex = routedIndex
+        }
+        setBreakEndTs(null)
+        setCurrentIdx(0)
+        if (nextIndex < modules.length) {
+          setCurrentModuleIndex(nextIndex)
+          const minutes = Number(modules[nextIndex]?.durationMinutes || 32)
+          setModuleEndTs(Date.now() + minutes * 60 * 1000)
+        } else {
+          setModuleEndTs(null)
+        }
+      }
+      return
+    }
+
+    if (moduleEndTs && moduleEndTs <= nowTs) {
+      const current = modules[currentModuleIndex]
+      const breakMinutes = Number(current?.breakAfterMinutes || 0)
+      if (breakMinutes > 0 && currentModuleIndex < modules.length - 1) {
+        setModuleEndTs(null)
+        setBreakEndTs(Date.now() + breakMinutes * 60 * 1000)
+      } else {
+        let nextIndex = currentModuleIndex + 1
+        const previous = modules[currentModuleIndex]
+        if (previous?.routing === 'adaptive') {
+          const previousQuestions = shuffledQuestions.filter(({ item }) => item.moduleId === previous.id)
+          const answeredCorrectly = previousQuestions.filter(({ item }) => {
+            const answer = answers[item.id]
+            return String(answer) === String(item.correctAnswer)
+          }).length
+          const ratio = previousQuestions.length ? answeredCorrectly / previousQuestions.length : 0
+          const targetDifficulty = ratio >= 0.75 ? 'hard' : 'easy'
+          const routedIndex = modules.findIndex((module, index) => index > currentModuleIndex && module.difficulty === targetDifficulty)
+          if (routedIndex >= 0) nextIndex = routedIndex
+        }
+        setCurrentIdx(0)
+        if (nextIndex < modules.length) {
+          setCurrentModuleIndex(nextIndex)
+          const minutes = Number(modules[nextIndex]?.durationMinutes || 32)
+          setModuleEndTs(Date.now() + minutes * 60 * 1000)
+        } else {
+          setModuleEndTs(null)
+        }
+      }
+    }
+  }, [started, submitted, modules, breakEndTs, moduleEndTs, currentModuleIndex, nowTs])
 
   useEffect(() => {
     if (!started || submitted) return
@@ -612,6 +694,14 @@ export default function TestSession() {
     // Savollarni aralashtirish
     const shuffled = shuffleWithIndices(test.questions)
     setShuffledQuestions(shuffled)
+    setCurrentIdx(0)
+    setCurrentModuleIndex(0)
+    if (modules.length > 0) {
+      const firstMinutes = Number(modules[0]?.durationMinutes || test.testData.duration)
+      setModuleEndTs(Date.now() + (Number.isFinite(firstMinutes) ? firstMinutes : 32) * 60 * 1000)
+    } else {
+      setModuleEndTs(null)
+    }
 
     // Duration end timestamp hisoblash
     const endTs = durationMs > 0 ? Date.now() + durationMs : null
@@ -641,14 +731,14 @@ export default function TestSession() {
   }
 
   const unansweredCount = useMemo(() => {
-    if (!shuffledQuestions.length) return 0
-    return shuffledQuestions.filter(({ item: q }) => {
+    if (!activeShuffledQuestions.length) return 0
+    return activeShuffledQuestions.filter(({ item: q }) => {
       const a = answers[q.id]
       return !isQuestionAnswered(q, a)
     }).length
-  }, [shuffledQuestions, answers])
+  }, [activeShuffledQuestions, answers])
 
-  const answeredCount = (shuffledQuestions.length || 0) - unansweredCount
+  const answeredCount = (activeShuffledQuestions.length || 0) - unansweredCount
 
   // ── Not found ──
   if (loading) {
@@ -689,7 +779,7 @@ export default function TestSession() {
 
           {started && !submitted && (
             <div className="flex-1 min-w-0">
-              <ProgressBar answered={answeredCount} total={shuffledQuestions.length} />
+              <ProgressBar answered={answeredCount} total={activeShuffledQuestions.length} />
             </div>
           )}
 
@@ -747,15 +837,15 @@ export default function TestSession() {
               </span>
             )}
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-50 border border-slate-200 text-slate-600 text-xs font-medium">
-              📊 {test.testData.scoringType === 'rasch' ? 'Rasch Model' : 'Klassik'}
+              📊 {test.testData.scoringType === 'rasch' ? 'Rasch Model' : test.testData.scoringType === 'irt' ? 'IRT 2PL / Adaptive SAT' : 'Klassik'}
             </span>
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-50 border border-slate-200 text-slate-600 text-xs font-medium">
               📝 {test.questions.length} ta savol
             </span>
           </div>
-          {test.testData.scoringType === 'rasch' && (
+          {['rasch', 'irt'].includes(test.testData.scoringType) && (
             <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
-              ⚡ Rasch tanlangan: natijalar real time chiqarilmaydi, admin tekshiruvdan keyin e'lon qilinadi.
+              ⚡ Rasch/IRT tanlangan: natijalar real time chiqarilmaydi, admin tekshiruvdan keyin e'lon qilinadi.
             </div>
           )}
         </div>
@@ -835,14 +925,30 @@ export default function TestSession() {
         )}
 
         {/* ── Active test ── */}
-        {started && !submitted && shuffledQuestions.length > 0 && (
+        {started && !submitted && breakEndTs && (
+          <div className="rounded-xl border border-sky-200 bg-sky-50 p-8 text-center">
+            <div className="text-2xl font-bold text-sky-800">Tanaffus</div>
+            <p className="mt-2 text-sm text-sky-700">
+              Keyingi modul boshlanishiga: <strong>{formatCountdown(breakEndTs - nowTs)}</strong>
+            </p>
+          </div>
+        )}
+        {started && !submitted && !breakEndTs && activeShuffledQuestions.length > 0 && (
           <div className="space-y-4">
+            {currentModule && (
+              <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+                <span className="text-sm font-semibold text-slate-700">{currentModule.title}</span>
+                {moduleEndTs && (
+                  <span className="font-mono text-sm font-bold text-slate-800">{formatCountdown(moduleEndTs - nowTs)}</span>
+                )}
+              </div>
+            )}
 
             {/* Question navigator */}
             <div className="bg-white border border-slate-200 rounded-xl p-4">
               <p className="text-xs text-slate-500 font-medium mb-2">Savollar navigatsiyasi</p>
               <QuestionNav
-                questions={shuffledQuestions}
+                questions={activeShuffledQuestions}
                 answers={answers}
                 currentIdx={currentIdx}
                 onGoto={setCurrentIdx}
@@ -851,7 +957,7 @@ export default function TestSession() {
 
             {/* Current question */}
             {(() => {
-              const { item: question, originalIdx } = shuffledQuestions[currentIdx]
+              const { item: question, originalIdx } = activeShuffledQuestions[currentIdx]
               return (
                 <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-sm">
                   {/* Question header */}
@@ -868,7 +974,7 @@ export default function TestSession() {
                             question.type === 'essay' ? 'Yozma javob' : 'Qisqa javob'}
                       </span>
                     </div>
-                    {(test.testData.scoringType === 'rasch' || question.type === 'essay') && (
+                    {(['rasch', 'irt'].includes(test.testData.scoringType) || question.type === 'essay') && (
                       <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs font-semibold rounded-full">
                         {question.points || 1} ball
                       </span>
@@ -1030,13 +1136,13 @@ export default function TestSession() {
                     </button>
 
                     <span className="text-xs text-slate-400">
-                      {currentIdx + 1} / {shuffledQuestions.length}
+                      {currentIdx + 1} / {activeShuffledQuestions.length}
                     </span>
 
-                    {currentIdx < shuffledQuestions.length - 1 ? (
+                    {currentIdx < activeShuffledQuestions.length - 1 ? (
                       <button
                         type="button"
-                        onClick={() => setCurrentIdx(i => Math.min(shuffledQuestions.length - 1, i + 1))}
+                        onClick={() => setCurrentIdx(i => Math.min(activeShuffledQuestions.length - 1, i + 1))}
                         className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition"
                       >
                         Keyingi →
