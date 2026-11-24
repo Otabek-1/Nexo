@@ -119,6 +119,7 @@ export default function CreateTest() {
     () => getModulesDuration(testData.modules),
     [testData.modules]
   )
+  const requiresTelegramRegistration = testData.scoringType === 'irt' || testData.testType === 'sat'
 
   useEffect(() => {
     let mounted = true
@@ -178,10 +179,17 @@ export default function CreateTest() {
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target
-    setTestData(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value
-    }))
+    setTestData(prev => {
+      if (name === 'testType' && value === 'sat') {
+        return { ...prev, testType: value, scoringType: 'irt', attemptsEnabled: true }
+      }
+      if (name === 'scoringType' && prev.testType === 'sat') {
+        return { ...prev, scoringType: 'irt', attemptsEnabled: true }
+      }
+      const next = { ...prev, [name]: type === 'checkbox' ? checked : value }
+      if (name === 'scoringType' && value === 'irt') next.attemptsEnabled = true
+      return next
+    })
   }
 
   const addModule = () => {
@@ -541,7 +549,7 @@ export default function CreateTest() {
 
     const title = testData.title.trim()
     const duration = modulesDuration ?? Number(testData.duration)
-    const attemptsEnabled = Boolean(testData.attemptsEnabled)
+    const attemptsEnabled = Boolean(testData.attemptsEnabled || requiresTelegramRegistration)
     const attempts = Number(testData.attemptsCount)
     const registrationWindowHours = Number(testData.registrationWindowHours)
     const startMs = new Date(testData.startTime).getTime()
@@ -617,8 +625,9 @@ export default function CreateTest() {
         duration: String(modulesDuration ?? Number(testData.duration)),
         startTime: toUtcISOString(testData.startTime),
         endTime: toUtcISOString(testData.endTime),
-        attemptsCount: testData.attemptsEnabled ? String(testData.attemptsCount) : '1',
-        registrationWindowHours: testData.attemptsEnabled
+        attemptsEnabled: Boolean(testData.attemptsEnabled || requiresTelegramRegistration),
+        attemptsCount: (testData.attemptsEnabled || requiresTelegramRegistration) ? String(testData.attemptsCount) : '1',
+        registrationWindowHours: (testData.attemptsEnabled || requiresTelegramRegistration)
           ? Number(testData.registrationWindowHours)
           : null,
         participantFields: normalizedFields
@@ -898,19 +907,22 @@ export default function CreateTest() {
                       type="checkbox"
                       id="attemptsEnabled"
                       name="attemptsEnabled"
-                      checked={Boolean(testData.attemptsEnabled)}
+                      checked={Boolean(testData.attemptsEnabled || requiresTelegramRegistration)}
+                      disabled={requiresTelegramRegistration}
                       onChange={handleChange}
                       className="mt-1 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                     />
                     <span>
                       <span className="block text-sm font-semibold text-slate-800">Attempt limitni yoqish</span>
                       <span className="block text-xs text-slate-600 mt-1">
-                        Yoqilsa, userlar Telegram bot orqali ro'yxatdan o'tib telefon raqami bilan kiradi.
+                        {requiresTelegramRegistration
+                          ? "IRT/SAT testlarda bu majburiy: ishtirokchilar botda /start bosib telefon raqamini ulashadi, natija tayyor bo'lganda bot xabar yuboradi."
+                          : "Yoqilsa, userlar Telegram bot orqali ro'yxatdan o'tib telefon raqami bilan kiradi."}
                       </span>
                     </span>
                   </label>
 
-                  {testData.attemptsEnabled && (
+                  {(testData.attemptsEnabled || requiresTelegramRegistration) && (
                     <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <label htmlFor="attemptsCount" className="block text-sm font-medium text-slate-700 mb-2">
@@ -924,7 +936,7 @@ export default function CreateTest() {
                           onChange={handleChange}
                           min="1"
                           className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          required={Boolean(testData.attemptsEnabled)}
+                          required={Boolean(testData.attemptsEnabled || requiresTelegramRegistration)}
                         />
                       </div>
                       <div>
@@ -939,7 +951,7 @@ export default function CreateTest() {
                           onChange={handleChange}
                           min="1"
                           className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          required={Boolean(testData.attemptsEnabled)}
+                          required={Boolean(testData.attemptsEnabled || requiresTelegramRegistration)}
                         />
                         <p className="mt-2 text-xs text-slate-500">
                           Registratsiya test yaratilgan vaqtdan boshlab shu soat davomida ochiq bo'ladi.
@@ -958,6 +970,7 @@ export default function CreateTest() {
                     name="scoringType"
                     value={testData.scoringType}
                     onChange={handleChange}
+                    disabled={testData.testType === 'sat'}
                     className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
                     required
                   >
@@ -1033,6 +1046,7 @@ export default function CreateTest() {
                     <option value="exam">Imtihon</option>
                     <option value="olympiad">Olimpiada</option>
                     <option value="test">Shunchaki Test</option>
+                    <option value="sat">SAT</option>
                   </select>
                 </div>
               </div>
