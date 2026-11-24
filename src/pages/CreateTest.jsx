@@ -41,6 +41,17 @@ const formatApiError = (error) => {
   return 'Imtihonni saqlashda xatolik yuz berdi'
 }
 
+const getModulesDuration = (modules) => {
+  if (!Array.isArray(modules) || modules.length === 0) return null
+  return modules.reduce((total, module, index) => {
+    const moduleMinutes = Math.max(1, Number(module.durationMinutes) || 1)
+    const breakMinutes = index < modules.length - 1
+      ? Math.max(0, Number(module.breakAfterMinutes) || 0)
+      : 0
+    return total + moduleMinutes + breakMinutes
+  }, 0)
+}
+
 export default function CreateTest() {
   const TWO_PART_WRITTEN_TYPE = 'two-part-written'
   const TWO_PART_MATH_TYPE = 'two-part-math'
@@ -104,6 +115,10 @@ export default function CreateTest() {
     if (!createdTest) return ''
     return getPublicTestUrl(createdTest.id)
   }, [createdTest])
+  const modulesDuration = useMemo(
+    () => getModulesDuration(testData.modules),
+    [testData.modules]
+  )
 
   useEffect(() => {
     let mounted = true
@@ -525,14 +540,14 @@ export default function CreateTest() {
     e.preventDefault()
 
     const title = testData.title.trim()
-    const duration = Number(testData.duration)
+    const duration = modulesDuration ?? Number(testData.duration)
     const attemptsEnabled = Boolean(testData.attemptsEnabled)
     const attempts = Number(testData.attemptsCount)
     const registrationWindowHours = Number(testData.registrationWindowHours)
     const startMs = new Date(testData.startTime).getTime()
     const endMs = new Date(testData.endTime).getTime()
 
-    if (!title || !testData.startTime || !testData.endTime || !testData.duration) {
+    if (!title || !testData.startTime || !testData.endTime || !duration) {
       alert('Barcha majburiy maydonlarni toldiring')
       return
     }
@@ -599,6 +614,7 @@ export default function CreateTest() {
     const payload = {
       testData: {
         ...testData,
+        duration: String(modulesDuration ?? Number(testData.duration)),
         startTime: toUtcISOString(testData.startTime),
         endTime: toUtcISOString(testData.endTime),
         attemptsCount: testData.attemptsEnabled ? String(testData.attemptsCount) : '1',
@@ -866,10 +882,11 @@ export default function CreateTest() {
                     type="number"
                     id="duration"
                     name="duration"
-                    value={testData.duration}
+                    value={modulesDuration ?? testData.duration}
                     onChange={handleChange}
                     placeholder="Masalan: 120"
                     min="1"
+                    readOnly={modulesDuration !== null}
                     className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     required
                   />
@@ -966,6 +983,10 @@ export default function CreateTest() {
                     <p className="text-xs text-slate-500">Modul yo'q bo'lsa test bitta umumiy sessiya sifatida ishlaydi.</p>
                   ) : (
                     <div className="space-y-2">
+                      <p className="text-xs text-slate-600">
+                        Umumiy imtihon vaqti modullar va modullar orasidagi tanaffusdan hisoblanadi: <strong>{modulesDuration} daqiqa</strong>.
+                        Oxirgi moduldan keyingi tanaffus hisobga olinmaydi.
+                      </p>
                       {testData.modules.map((module, index) => (
                         <div key={module.id} className="grid grid-cols-2 md:grid-cols-7 gap-2 rounded-lg border border-slate-200 p-3">
                           <input
