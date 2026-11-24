@@ -125,7 +125,7 @@ export default function ReviewSubmissions() {
 
     setFinalizingSubmissionId(submission.id)
     try {
-      const updated = await finalizeSubmission(test.id, submission.id, test.testData.scoringType === 'rasch' ? null : finalScore)
+      const updated = await finalizeSubmission(test.id, submission.id, usesBatchScoring ? null : finalScore)
       setSubmissions(prev => prev.map(item => (item.id === submission.id ? updated : item)))
       setRefreshTick(v => v + 1)
     } finally {
