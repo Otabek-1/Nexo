@@ -51,7 +51,7 @@ export default function TestResults() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
+      <div className="stage grain min-h-screen flex items-center justify-center">
         <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-12">
           <div className="animate-spin rounded-full h-12 w-12 border-4 border-white/30 border-t-white mx-auto mb-4"></div>
           <p className="text-white/80 text-center font-medium">Yuklanmoqda...</p>
@@ -63,7 +63,11 @@ export default function TestResults() {
   const topThree = ranked.slice(0, 3)
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 relative overflow-hidden">
+    <div className="stage grain min-h-screen">
+      <div className="grid-lines" />
+      <div className="orb w-[30rem] h-[30rem] -top-32 -left-24 bg-violet-600" />
+      <div className="orb w-[26rem] h-[26rem] top-1/3 -right-20 bg-cyan-500/80" style={{ animationDelay: '-7s' }} />
+      <div className="orb w-[24rem] h-[24rem] bottom-0 left-1/3 bg-rose-500/60" style={{ animationDelay: '-12s' }} />
       {/* Animated background elements */}
       <div className="fixed inset-0 pointer-events-none">
         <div className="absolute top-0 left-1/4 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl animate-blob"></div>
@@ -75,7 +79,7 @@ export default function TestResults() {
         {/* Header */}
         <div className="mb-16">
           <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-3xl p-8 mb-8">
-            <h1 className="text-4xl sm:text-5xl font-bold bg-gradient-to-r from-white via-purple-200 to-white bg-clip-text text-transparent mb-2">
+            <h1 className="text-4xl sm:text-5xl font-bold prism-text mb-2">
               Test Natijalari
             </h1>
             <p className="text-white/60 text-lg">Rasch modeli bilan hisoblangan o'quvchilar reytingi</p>
@@ -116,7 +120,7 @@ export default function TestResults() {
         {/* Rasch Stats Section */}
         {raschStats && (
           <div className="mb-16">
-            <div className="backdrop-blur-xl bg-gradient-to-br from-white/10 to-white/5 border border-white/20 rounded-3xl p-8 mb-8">
+            <div className="glass rounded-3xl p-8 mb-8">
               <h2 className="text-3xl font-bold text-white mb-6">Rasch Statistikasi</h2>
               
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -177,7 +181,7 @@ export default function TestResults() {
         )}
 
         {/* Leaderboard Tabs */}
-        <div className="backdrop-blur-xl bg-gradient-to-br from-white/10 to-white/5 border border-white/20 rounded-3xl overflow-hidden">
+        <div className="glass rounded-3xl overflow-hidden">
           <div className="flex border-b border-white/10">
             {['ranked', 'pending'].map((tab) => (
               <button

@@ -64,7 +64,7 @@ export default function ReviewSubmissions() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+      <div className="min-h-screen flex items-center justify-center p-6">
         <div className="bg-white border border-slate-200 rounded-xl p-8 max-w-lg text-center">
           <h1 className="text-2xl font-bold text-slate-800 mb-2">Yuklanmoqda...</h1>
         </div>
@@ -74,7 +74,7 @@ export default function ReviewSubmissions() {
 
   if (!test) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+      <div className="min-h-screen flex items-center justify-center p-6">
         <div className="bg-white border border-slate-200 rounded-xl p-8 max-w-lg text-center">
           <h1 className="text-2xl font-bold text-slate-800 mb-2">Test topilmadi</h1>
           <Link to="/dashboard" className="inline-block mt-4 text-blue-600 hover:underline">Dashboardga qaytish</Link>
@@ -85,7 +85,7 @@ export default function ReviewSubmissions() {
 
   if (!isCreatorMode) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+      <div className="min-h-screen flex items-center justify-center p-6">
         <div className="bg-white border border-slate-200 rounded-xl p-8 max-w-lg text-center">
           <h1 className="text-2xl font-bold text-slate-800 mb-2">Ruxsat yo'q</h1>
           <p className="text-slate-600">Bu bo'lim faqat test yaratuvchisi/admin uchun.</p>
@@ -204,11 +204,11 @@ export default function ReviewSubmissions() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen">
       <header className="bg-white border-b border-slate-200">
         <div className="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center">
           <div>
-            <h1 className="text-2xl font-bold text-blue-600">Nexo</h1>
+            <h1 className="brand-text text-2xl font-bold">Nexo</h1>
             <p className="text-sm text-slate-600">Yozma javoblarni baholash</p>
           </div>
           <Link to="/dashboard" className="px-4 py-2 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-100">Dashboard</Link>

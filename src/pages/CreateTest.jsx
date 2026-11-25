@@ -713,7 +713,7 @@ export default function CreateTest() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+      <div className="min-h-screen flex items-center justify-center p-6">
         <div className="bg-white border border-slate-200 rounded-xl p-8 max-w-lg text-center">
           <h1 className="text-2xl font-bold text-slate-800 mb-2">Yuklanmoqda...</h1>
         </div>
@@ -723,7 +723,7 @@ export default function CreateTest() {
 
   if (id && !editingTest) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+      <div className="min-h-screen flex items-center justify-center p-6">
         <div className="bg-white border border-slate-200 rounded-xl p-8 max-w-lg text-center">
           <h1 className="text-2xl font-bold text-slate-800 mb-2">Imtihon topilmadi</h1>
           <button
@@ -739,10 +739,10 @@ export default function CreateTest() {
   }
 
   return (
-    <div className="w-full min-h-screen bg-slate-50">
+    <div className="w-full min-h-screen">
       <header className="bg-white shadow-sm border-b border-slate-200">
         <div className="max-w-4xl mx-auto px-8 py-4 flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-blue-600">Nexo</h1>
+          <h1 className="brand-text text-2xl font-bold">Nexo</h1>
           <button
             onClick={() => navigate('/dashboard')}
             className="px-4 py-2 text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50 transition"
@@ -756,7 +756,7 @@ export default function CreateTest() {
         {step === 'info' && (
           <>
             <div className="mb-8">
-              <h2 className="text-3xl font-bold text-slate-800">{isEditing ? 'Imtihonni Yangilash' : 'Yangi Imtihon Yaratish'}</h2>
+              <h2 className="brand-text text-3xl font-bold">{isEditing ? 'Imtihonni Yangilash' : 'Yangi Imtihon Yaratish'}</h2>
               <p className="text-slate-600 mt-2">
                 {isEditing ? 'Mavjud imtihon malumotlarini tahrirlang' : 'Imtihon malumotlarini kiriting'}
               </p>
@@ -1095,7 +1095,7 @@ export default function CreateTest() {
         {step === 'questions' && (
           <>
             <div className="mb-8">
-              <h2 className="text-3xl font-bold text-slate-800">Savollarni Qoshish</h2>
+              <h2 className="brand-text text-3xl font-bold">Savollarni Qoshish</h2>
               <p className="text-slate-600 mt-2">{testData.title}</p>
             </div>
 
