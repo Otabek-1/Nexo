@@ -118,10 +118,10 @@ export default function Dashboard() {
   return (
     <div className="w-full min-h-screen bg-slate-50">
       <header className="bg-white shadow-sm border-b border-slate-200">
-      <marquee behavior="" direction="">Sayt test rejimida ishlamoqda va ba'zi kichik muammolarga duch kelishingiz mumkin. Hozircha oddiy test turidan foydalanishni tavsiya qilamiz va tez orada barcha muammolarni tuzatamiz!</marquee>
+      <div className="bg-gradient-to-r from-violet-600 via-fuchsia-500 to-rose-500 text-white text-xs sm:text-sm text-center px-4 py-2">Sayt test rejimida ishlamoqda va ba'zi kichik muammolarga duch kelishingiz mumkin. Hozircha oddiy test turidan foydalanishni tavsiya qilamiz va tez orada barcha muammolarni tuzatamiz!</div>
         <div className="max-w-6xl mx-auto px-8 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-bold text-blue-600">Nexo</h1>
+            <h1 className="brand-text text-3xl font-bold">Nexo</h1>
             <p className="text-slate-600 text-sm">Dashboard</p>
           </div>
           <div className="flex items-center gap-4">
@@ -145,9 +145,11 @@ export default function Dashboard() {
       </header>
 
       <main className="max-w-6xl mx-auto px-8 py-12">
-        <div className="mb-10">
-          <h2 className="text-2xl font-bold text-slate-800 mb-2">Xush kelibsiz!</h2>
-          <p className="text-slate-600">Imtihonlaringiz va testlaringiz bilan ishlang</p>
+        <div className="stage grain prism-border rounded-3xl px-8 py-10 mb-10">
+          <div className="orb w-72 h-72 -top-24 -right-10 bg-violet-600" />
+          <div className="orb w-60 h-60 -bottom-24 left-1/3 bg-cyan-500/70" style={{ animationDelay: '-8s' }} />
+          <h2 className="text-3xl sm:text-4xl font-bold mb-2 text-white">Xush kelibsiz!</h2>
+          <p className="text-white/70">Imtihonlaringiz va testlaringiz bilan ishlang</p>
         </div>
 
         <div className={`mb-6 rounded-lg border px-4 py-3 text-sm ${isPro ? 'border-emerald-300 bg-emerald-50 text-emerald-900' : 'border-amber-300 bg-amber-50 text-amber-900'}`}>

@@ -122,3 +122,28 @@ button:not(:disabled):active { transform: scale(0.97); }
   *, *::before, *::after { animation: none !important; transition: none !important; }
   .rise { opacity: 1; }
 }
+
+/* ---------- App pages (Dashboard, forms, tests): restyle existing utilities ---------- */
+.brand-text { background: linear-gradient(100deg, #5f4ff0, #a855f7 60%, #ec4899); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.text-slate-900, .text-slate-800 { color: #1a1640; }
+.text-slate-700 { color: #2b2658; }
+.text-slate-600 { color: #4a4577; }
+.border-slate-200, .border-slate-100 { border-color: rgba(117, 102, 251, 0.16); }
+.border-slate-300 { border-color: rgba(117, 102, 251, 0.30); }
+.bg-slate-50 { background-color: rgba(243, 241, 255, 0.75); }
+.shadow-sm { box-shadow: 0 2px 14px -6px rgba(95, 79, 240, 0.25); }
+.shadow-lg, .shadow-xl { box-shadow: 0 18px 44px -18px rgba(95, 79, 240, 0.5); }
+.shadow-2xl { box-shadow: 0 32px 80px -24px rgba(95, 79, 240, 0.55); }
+
+header.bg-white { position: sticky; top: 0; z-index: 30; background-color: rgba(255, 255, 255, 0.72); backdrop-filter: blur(16px) saturate(170%); -webkit-backdrop-filter: blur(16px) saturate(170%); }
+main { animation: rise .7s cubic-bezier(.2,.8,.2,1) both; }
+
+.bg-blue-600 { background-image: linear-gradient(120deg, #5f4ff0, #8b5cf6 65%, #a855f7); }
+.bg-blue-600:hover, .hover\:bg-blue-700:hover { background-image: linear-gradient(120deg, #4d3dd6, #7c3aed 65%, #9333ea); }
+.bg-blue-600:disabled { background-image: none; }
+button.bg-blue-600:not(:disabled), a.bg-blue-600 { box-shadow: 0 10px 28px -12px rgba(124, 58, 237, 0.8), inset 0 1px 0 rgba(255,255,255,.25); }
+
+input:not([type="checkbox"]):not([type="radio"]), select, textarea { background-color: rgba(255, 255, 255, 0.9); transition: box-shadow .2s ease, border-color .2s ease; }
+input:not([type="checkbox"]):not([type="radio"]):focus, select:focus, textarea:focus { border-color: var(--color-blue-500); box-shadow: 0 0 0 4px rgba(117, 102, 251, 0.18); }
+input[type="checkbox"], input[type="radio"] { accent-color: var(--color-blue-600); }
+::selection { background: rgba(139, 92, 246, 0.3); }
