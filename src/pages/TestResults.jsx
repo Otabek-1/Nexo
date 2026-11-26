@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { getLeaderboard } from '../lib/testStore'
+import { getLeaderboard, getTestById } from '../lib/testStore'
 import QuestionDetailModal from '../components/QuestionDetailModal'
 
 const formatDateTime = (isoDate) => {
@@ -32,10 +32,18 @@ export default function TestResults() {
   const [activeTab, setActiveTab] = useState('ranked')
 
   useEffect(() => {
+    setActiveTab('ranked')
     const load = async () => {
       try {
-        const data = await getLeaderboard(Number(id))
+        const [data, testData] = await Promise.all([
+          getLeaderboard(Number(id)),
+          getTestById(id)
+        ])
         setLeaderboard(data)
+        setTest(testData)
+        if (testData?.testData?.testType === 'sat' && !data?.ranked?.length && data?.pending?.length) {
+          setActiveTab('sat')
+        }
       } catch (error) {
         console.error('Failed to load leaderboard:', error)
       } finally {
@@ -47,6 +55,10 @@ export default function TestResults() {
 
   const ranked = leaderboard?.ranked || []
   const pending = leaderboard?.pending || []
+  const isSatExam = test?.testData?.testType === 'sat'
+  const pendingSatResults = pending.slice().sort((a, b) => (
+    Number(b.autoScore || 0) - Number(a.autoScore || 0)
+  ))
   const raschStats = leaderboard?.raschStats || null
 
   if (loading) {
@@ -78,7 +90,9 @@ export default function TestResults() {
             <h1 className="text-4xl sm:text-5xl font-bold bg-gradient-to-r from-white via-purple-200 to-white bg-clip-text text-transparent mb-2">
               Test Natijalari
             </h1>
-            <p className="text-white/60 text-lg">Rasch modeli bilan hisoblangan o'quvchilar reytingi</p>
+            <p className="text-white/60 text-lg">
+              {isSatExam ? 'SAT imtihoni qatnashchilari natijalari' : "Rasch modeli bilan hisoblangan o'quvchilar reytingi"}
+            </p>
           </div>
 
           {/* Top 3 Winners Card */}
@@ -179,7 +193,7 @@ export default function TestResults() {
         {/* Leaderboard Tabs */}
         <div className="backdrop-blur-xl bg-gradient-to-br from-white/10 to-white/5 border border-white/20 rounded-3xl overflow-hidden">
           <div className="flex border-b border-white/10">
-            {['ranked', 'pending'].map((tab) => (
+            {['ranked', ...(isSatExam ? ['sat'] : []), 'pending'].map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -189,13 +203,47 @@ export default function TestResults() {
                     : 'text-white/60 hover:text-white/80'
                 }`}
               >
-                {tab === 'ranked' ? '📊 Reyting Jadvali' : '⏳ Tekshirish Jarayonida'}
+                {tab === 'ranked'
+                  ? '📊 Reyting Jadvali'
+                  : tab === 'sat' ? '🏆 SAT dastlabki reytingi' : '⏳ Tekshirish Jarayonida'}
               </button>
             ))}
           </div>
 
           <div className="p-8">
-            {activeTab === 'ranked' ? (
+            {activeTab === 'sat' && isSatExam ? (
+              <div className="space-y-4">
+                <p className="rounded-xl border border-amber-400/30 bg-amber-500/10 p-4 text-sm text-amber-100">
+                  Bu dastlabki reyting: hozircha javoblar bo‘yicha xom ball ko‘rsatilgan. IRT modelining yakuniy ballari hisoblangach, asosiy reytingda chiqadi.
+                </p>
+                {pendingSatResults.length > 0 ? (
+                  pendingSatResults.map((submission, idx) => (
+                    <div
+                      key={submission.id}
+                      className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-2xl p-6"
+                    >
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-4 min-w-0">
+                          <div className="w-12 text-center text-2xl font-bold text-purple-200">#{idx + 1}</div>
+                          <div className="min-w-0">
+                            <h3 className="font-semibold text-white truncate">{getParticipantName(submission.participant)}</h3>
+                            <p className="text-sm text-white/60">{getParticipantSecondary(submission.participant)}</p>
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="text-2xl font-bold text-cyan-200">
+                            {submission.autoScore ?? '-'} / {submission.autoMaxScore ?? '-'}
+                          </p>
+                          <p className="text-xs text-white/50">Dastlabki xom ball</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-12 text-white/60">Hali topshirilgan SAT imtihonlari yo‘q</div>
+                )}
+              </div>
+            ) : activeTab === 'ranked' ? (
               <div className="space-y-3">
                 {ranked.length > 0 ? (
                   ranked.map((submission, idx) => (

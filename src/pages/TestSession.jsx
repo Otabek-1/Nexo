@@ -4,6 +4,7 @@ import { createSubmissionRecord, getAttemptsForParticipantValue, getTestById } f
 import RichContent from '../components/RichContent'
 import AppFooter from '../components/AppFooter'
 import ButtonSpinner from '../components/ButtonSpinner'
+import DesmosCalculator from '../components/DesmosCalculator'
 import {
   answerTextToCells,
   cellsToAnswerText,
@@ -519,6 +520,12 @@ export default function TestSession() {
       if (q.type === 'multiple-choice' || q.type === 'true-false') {
         autoMaxScore += max
         if (String(answer) === String(q.correctAnswer)) autoScore += max
+        return
+      }
+
+      if (q.type === SAT_MATH_INPUT_TYPE) {
+        autoMaxScore += max
+        if (isRoutingAnswerCorrect(q, answer)) autoScore += max
         return
       }
 
@@ -1305,6 +1312,7 @@ export default function TestSession() {
           </div>
         )}
       </main>
+      {test.testData.testType === 'sat' && started && !submitted && <DesmosCalculator />}
       <AppFooter />
 
       {/* ── Confirm modal ── */}
